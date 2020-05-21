@@ -4,6 +4,9 @@
 #include <vector>
 #include "math.h"
 
+#include "eigen3/Eigen/Dense"
+#include "eigen3/Eigen/Geometry"
+
 using namespace std;
 
 struct Pose {

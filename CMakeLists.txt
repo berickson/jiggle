@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   rosbag
   sensor_msgs
+
 )
 
 ## System dependencies are found with CMake's conventions
@@ -111,15 +112,21 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+
+
 ###########
 ## Build ##
 ###########
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
+find_package(Eigen3 REQUIRED)
+# include_directories()
+
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
