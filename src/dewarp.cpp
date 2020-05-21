@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-#include "Eigen/Dense"
-#include "Eigen/Geometry"
+#include "eigen3/Eigen/Dense"
+#include "eigen3/Eigen/Geometry"
 #include <iomanip>
 #include <vector>
 #include <functional>
@@ -621,7 +621,7 @@ void test_intersection() {
 }
 
 
-
+/*
 int main(int, char**)
 {
 
@@ -642,3 +642,4 @@ int main(int, char**)
     return 0;
 
 }
+*/
