@@ -253,8 +253,8 @@ T fake_laser_reading(const Pose<T> & pose, T theta, const vector<LineSegment<T>>
         }
     }
 
-    std::normal_distribution<T> random_scale(1.0, 0.01);
-    return best_d * random_scale(random_engine);
+    //std::normal_distribution<T> random_scale(1.0, 0.01);
+    return best_d;// * random_scale(random_engine);
 }
 
 template <class T=double>
@@ -298,7 +298,7 @@ vector<ScanLine<T>> untwist_scan(
     Point2d<T> p1 = {NAN, NAN};
     Point2d<T> p2 = {NAN, NAN};
     for(size_t i = 0; i < twisted_readings.size()+1; ++i) {
-        T scan_theta = (T) i / count * 2. * EIGEN_PI;
+        T scan_theta = twisted_readings[i%count].theta;//(T) i / count * 2. * EIGEN_PI;
         T d1 = twisted_readings[i%count].d;
         p1=p2;
         pose.Pose2World({cos(scan_theta)*d1, sin(scan_theta)*d1}, p2);
@@ -314,7 +314,7 @@ vector<ScanLine<T>> untwist_scan(
 
     Pose<T> pose2(0,0,0);
     for(int i = 0; i < count; ++i) {
-        T scan_theta = (T) i / count * 2 * EIGEN_PI;
+        T scan_theta = twisted_readings[i].theta;//(T) i / count * 2 * EIGEN_PI;
         output.emplace_back(scan_theta, fake_laser_reading<T>(pose2, scan_theta, world));
     }
     untwist_timer.stop();
