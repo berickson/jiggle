@@ -30,11 +30,12 @@ void print_scan(const vector<ScanLine<float>> & lines) {
 }
 
 int main(int argc, char ** argv) {
-    bool trace_twist = true;
+    bool trace_twist = false;
     rosbag::Bag bag;
-    string bag_path = (argc == 2) ? argv[1]: "/home/brian/lidar_ws/Team_Hector_MappingBox_L101_Building.bag";
+    string bag_path = (argc >= 2) ? argv[1]: "/home/brian/lidar_ws/Team_Hector_MappingBox_Dagstuhl_Neubau.bag";
+    uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2],NULL,10): numeric_limits<uint32_t>::max();
     if(!trace_twist) {
-      cout << "sec,scan_sec,frame,scantime,twist_x,twist_y,twist_theta,dx,dy,dtheta,x,y,theta," << bag_path << endl;
+      cout << "sec,scan_sec,frame,scantime,dx,dy,dtheta,x,y,theta," << bag_path << endl;
     }
     bag.open(bag_path);  // BagMode is Read by default
 
@@ -42,7 +43,7 @@ int main(int argc, char ** argv) {
 
     std::vector<std::string> topics;
     topics.push_back(std::string("/scan"));
-    topics.push_back(std::string("/solution"));
+    //topics.push_back(std::string("/solution"));
 
     rosbag::View view(bag, rosbag::TopicQuery(topics));
     vector<ScanLine<float>> lines;
@@ -56,6 +57,7 @@ int main(int argc, char ** argv) {
     bool have_odom = false;
 
     for(rosbag::MessageInstance const m: view) {
+      ++n_msg;
       
       if(m.isType<nav_msgs::Odometry>())
       {
@@ -68,42 +70,46 @@ int main(int argc, char ** argv) {
 
 
       if(scan==NULL) continue;
+      ++n_scan;
+      if(n_scan > scan_count_limit) break;
 
       ros::Time scan_time = m.getTime();
       static ros::Time start_time;
-      if(n_msg == 0) {
+      if(n_scan == 1) {
         start_time = scan_time;
       }
       auto elapsed = scan_time - start_time;
 
-      if(n_msg%1 == 0) {
+      uint32_t scan_factor = 1;
+      if((n_scan-1) % scan_factor == 0) {
+        float fudge = 1.0;
         last_lines = lines;
         ros_scan_to_scan_lines(*scan, lines);
 
-        if(n_msg > 2) {
-            auto & twist = odom.twist.twist;
+        if(n_scan > 2) {
+            //auto & twist = odom.twist.twist;
             auto matched_pose = match_scans(last_lines, lines);
-            float scan_factor = 1;
+            auto untwisted = untwist_scan<float>(lines, fudge*matched_pose.get_x()/scan_factor, 0*fudge*matched_pose.get_y()/scan_factor, 0*fudge*matched_pose.get_theta()/scan_factor);
             if(trace_twist && n_scan == 1000) {
-              auto untwisted = untwist_scan<float>(lines, matched_pose.get_x()/scan_factor, matched_pose.get_y()/scan_factor, matched_pose.get_theta()/scan_factor);
               cout << "theta, d, x, y, untwisted_theta, untwisted_d, untwisted_x, untwisted_y" << endl;
               for(int i = 0; i < untwisted.size(); ++i ) {
                 auto & l = lines[i];
                 auto & u = untwisted[i];
                 cout << l.theta << ", " << l.d << ", " << l.d*cos(l.theta)  << ", " << l.d*sin(l.theta) << ", " << u.theta << ", " << u.d << ", " << u.d*cos(u.theta)  << ", " << u.d*sin(u.theta) << endl;
               }
-              //matched_pose = match_scans(last_lines, lines);
               //cout << " -> matched pose: " << to_string(matched_pose) << endl;
             }
+            lines = untwisted;
+            matched_pose = match_scans(last_lines, lines);
             pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
             if(!trace_twist) {
               cout << elapsed.toSec()  << ", "
                 << (scan->header.stamp-start_time).toSec() << ", "
                 << scan->header.frame_id << ", "
                 << scan->scan_time << ", " 
-                << twist.linear.x << ", "
-                << twist.linear.y << ", "
-                << twist.angular.z << ", "
+                ///<< twist.linear.x << ", "
+                //<< twist.linear.y << ", "
+                //<< twist.angular.z << ", "
                 << matched_pose.get_x()  << ", " 
                 << matched_pose.get_y()  << ", " 
                 << matched_pose.get_theta() << ", " 
@@ -116,20 +122,6 @@ int main(int argc, char ** argv) {
             last_dy = matched_pose.get_y();
             last_theta = matched_pose.get_theta();
         }
-      }
-
-      ++n_msg;
-      if (scan == nullptr) {
-        continue;
-      }
-      ++n_scan;
-
-      if(false && n_scan == 100) {
-        std::cout << "scan " << n_scan << " " << scan->header.stamp << std::endl;
-        for( auto range : scan->ranges ) {
-          std::cout << fixed << std::setprecision(3) << range << " ";
-        }
-      cout << endl;
       }
 
     }
