@@ -48,6 +48,9 @@ int main(int argc, char ** argv) {
     rosbag::View view(bag, rosbag::TopicQuery(topics));
     vector<ScanLine<float>> lines;
     vector<ScanLine<float>> last_lines;
+    vector<Point2d<float>> scan_xy;
+    vector<Point2d<float>> last_scan_xy;
+
     Pose<float> pose;
     float last_dx=0;
     float last_dy=0;
@@ -84,23 +87,18 @@ int main(int argc, char ** argv) {
       if((n_scan-1) % scan_factor == 0) {
         float fudge = 1.0;
         last_lines = lines;
+        last_scan_xy = scan_xy;
         ros_scan_to_scan_lines(*scan, lines);
+        scan_xy = get_scan_xy(lines);
 
         if(n_scan > 2) {
             //auto & twist = odom.twist.twist;
-            auto matched_pose = match_scans(last_lines, lines);
-            auto untwisted = untwist_scan<float>(lines, fudge*matched_pose.get_x()/scan_factor, 0*fudge*matched_pose.get_y()/scan_factor, 0*fudge*matched_pose.get_theta()/scan_factor);
-            if(trace_twist && n_scan == 1000) {
-              cout << "theta, d, x, y, untwisted_theta, untwisted_d, untwisted_x, untwisted_y" << endl;
-              for(int i = 0; i < untwisted.size(); ++i ) {
-                auto & l = lines[i];
-                auto & u = untwisted[i];
-                cout << l.theta << ", " << l.d << ", " << l.d*cos(l.theta)  << ", " << l.d*sin(l.theta) << ", " << u.theta << ", " << u.d << ", " << u.d*cos(u.theta)  << ", " << u.d*sin(u.theta) << endl;
-              }
-              //cout << " -> matched pose: " << to_string(matched_pose) << endl;
+            auto matched_pose = match_scans(last_scan_xy, scan_xy);
+            if(true) {
+              auto untwisted = untwist_scan<float>(scan_xy, fudge*matched_pose.get_x()/scan_factor, 0*fudge*matched_pose.get_y()/scan_factor, 0*fudge*matched_pose.get_theta()/scan_factor);
+              scan_xy = untwisted;
+              matched_pose = match_scans(last_scan_xy, scan_xy);
             }
-            lines = untwisted;
-            matched_pose = match_scans(last_lines, lines);
             pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
             if(!trace_twist) {
               cout << elapsed.toSec()  << ", "

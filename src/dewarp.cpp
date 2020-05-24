@@ -284,8 +284,8 @@ Stopwatch scan_difference_timer;
 Stopwatch match_scans_timer;
 
 template <class T=double>
-vector<ScanLine<T>> untwist_scan(
-        vector<ScanLine<T>> &twisted_readings, 
+vector<Point2d<T>> untwist_scan(
+        vector<Point2d<T>> &twisted_readings, 
         T twist_x, 
         T twist_y, 
         T twist_theta, 
@@ -293,32 +293,40 @@ vector<ScanLine<T>> untwist_scan(
     untwist_timer.start();
     int count = twisted_readings.size();
     Pose<T> pose = initial_pose;
-    vector<LineSegment<T>> world;
-    world.reserve(count);
+    //vector<LineSegment<T>> world;
+    //world.reserve(count);
+    vector<Point2d<T>> untwisted;
     Point2d<T> p1 = {NAN, NAN};
     Point2d<T> p2 = {NAN, NAN};
     for(size_t i = 0; i < twisted_readings.size()+1; ++i) {
-        T scan_theta = twisted_readings[i%count].theta;//(T) i / count * 2. * EIGEN_PI;
-        T d1 = twisted_readings[i%count].d;
+        //T scan_theta = twisted_readings[i%count].theta;//(T) i / count * 2. * EIGEN_PI;
+        // T d1 = twisted_readings[i%count].d;
+        //T x = twisted_readings[i%count].x;
+        //T y = twisted_readings[i%count].y;
         p1=p2;
-        pose.Pose2World({cos(scan_theta)*d1, sin(scan_theta)*d1}, p2);
-        if(! isnan(p1.x) && !isnan(p2.x)) {
-          world.emplace_back(p1, p2);
+        p2 = twisted_readings[i%count];
+        if(!isnan(p2.x)) {
+            pose.Pose2World(twisted_readings[i%count], p2);
+            untwisted.emplace_back(p2);
         }
+        // if(! isnan(p1.x) && !isnan(p2.x)) {
+        //   world.emplace_back(p1, p2);
+        // }
         pose.move({twist_x/count, twist_y/count}, twist_theta/count);
     }
 
 
-    vector<ScanLine<T>> output;
-    output.reserve(count);
+    // vector<ScanLine<T>> output;
+    // output.reserve(count);
 
-    Pose<T> pose2(0,0,0);
-    for(int i = 0; i < count; ++i) {
-        T scan_theta = twisted_readings[i].theta;//(T) i / count * 2 * EIGEN_PI;
-        output.emplace_back(scan_theta, fake_laser_reading<T>(pose2, scan_theta, world));
-    }
-    untwist_timer.stop();
-    return output;
+    // Pose<T> pose2(0,0,0);
+    // for(int i = 0; i < count; ++i) {
+    //     T scan_theta = twisted_readings[i].theta;//(T) i / count * 2 * EIGEN_PI;
+    //     output.emplace_back(scan_theta, fake_laser_reading<T>(pose2, scan_theta, world));
+    // }
+    // untwist_timer.stop();
+    // return output;
+    return untwisted;
 }
 
 template <class T = double>
@@ -486,22 +494,27 @@ T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & s
     return total_difference / points_compared;
 }
 
+template <class T> void  get_scan_xy(const vector<ScanLine<T>> & scan, vector<Point2d<T>> & scan_xy) {
+    scan_xy.resize(scan.size());
+    uint32_t i = 0;
+    for(auto & scan_line : scan) {
+        scan_xy[i] = Point2d<T>{scan_line.d * cos(scan_line.theta),scan_line.d * sin(scan_line.theta)};
+        ++i;
+    }
+}
+
 template <class T> vector<Point2d<T>> get_scan_xy(const vector<ScanLine<T>> & scan) {
     vector<Point2d<T>> scan_xy;
-    scan_xy.reserve(scan.size());
-    for(auto & scan_line : scan) {
-        scan_xy.emplace_back(scan_line.d * cos(scan_line.theta),scan_line.d * sin(scan_line.theta));
-    }
+    get_scan_xy(scan, scan_xy);
     return scan_xy;
 }
 
+
 template <class T = double>
-Pose<T> match_scans(const vector<ScanLine<T>> & scan1, const vector<ScanLine<T>> & scan2) {
+Pose<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>> & scan2_xy) {
     match_scans_timer.start();
-    auto scan1_xy = get_scan_xy(scan1);
-    auto scan2_xy = get_scan_xy(scan2);
     vector<Point2d<T>> scan2b;
-    scan2b.reserve(scan1.size());
+    scan2b.reserve(scan2_xy.size());
     auto error_function = [&scan1_xy, &scan2_xy, &scan2b](const vector<T> & params){
         Pose<T> pose(params[0], params[1], params[2]);
         move_scan(scan2_xy, pose, scan2b);
@@ -515,6 +528,15 @@ Pose<T> match_scans(const vector<ScanLine<T>> & scan1, const vector<ScanLine<T>>
     Pose<T> match(r.p[0], r.p[1], r.p[2]);
     match_scans_timer.stop();
     return match;
+}
+
+
+template <class T = double>
+Pose<T> match_scans(const vector<ScanLine<T>> & scan1, const vector<ScanLine<T>> & scan2) {
+    match_scans_timer.start();
+    auto scan1_xy = get_scan_xy(scan1);
+    auto scan2_xy = get_scan_xy(scan2);
+    return match_scans(scan1_xy, scan2_xy);
 }
 
 
@@ -598,11 +620,12 @@ void test_scan_with_twist() {
     double reading_count = 360;
     Pose<double> pose1;
     auto twisted = scan_with_twist(world, reading_count, twist_x, twist_y, twist_theta, pose1);
-    auto untwisted = untwist_scan(twisted, twist_x, twist_y, twist_theta);
+    auto twisted_xy = get_scan_xy(twisted);
+    auto untwisted = untwist_scan(twisted_xy, twist_x, twist_y, twist_theta);
     cout << endl << endl << "twisted scan" << endl;
     print_scan(twisted);
     cout << endl << endl << "untwisted scan" << endl;
-    print_scan(untwisted);
+    //print_scan(untwisted);
 }
 
 void test_intersection() {
