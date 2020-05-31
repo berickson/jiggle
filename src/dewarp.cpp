@@ -549,7 +549,8 @@ T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & s
 
         // tbd: what is the best difference metric?
         // total_difference += sqrt(dx*dx+dy*dy);
-        total_difference += fabs(dx)+fabs(dy);
+        //total_difference += fabs(dx)+fabs(dy);
+        total_difference -= exp(-1000*(dx*dx+dy*dy));
         ++points_compared;
 
         // grab next non-null p1 and continue
