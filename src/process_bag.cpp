@@ -2,8 +2,9 @@
 #include <rosbag/view.h>
 #include <std_msgs/Int32.h>
 #include <sensor_msgs/LaserScan.h>
-
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <tf/tfMessage.h>
 
 #include <iomanip>
 
@@ -30,12 +31,14 @@ void print_scan(const vector<ScanLine<float>> & lines) {
 }
 
 int main(int argc, char ** argv) {
+
     bool trace_twist = false;
     rosbag::Bag bag;
     string bag_path = (argc >= 2) ? argv[1]: "/home/brian/lidar_ws/Team_Hector_MappingBox_Dagstuhl_Neubau.bag";
     uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2],NULL,10): numeric_limits<uint32_t>::max();
+
     if(!trace_twist) {
-      cout << "sec,scan_sec,frame,scantime,dx,dy,dtheta,x,y,theta," << bag_path << endl;
+      cout << "frame,sec,nsec,scan_time,dx,dy,dtheta,x,y,theta,bag_path" << endl;
     }
     bag.open(bag_path);  // BagMode is Read by default
 
@@ -43,6 +46,8 @@ int main(int argc, char ** argv) {
 
     std::vector<std::string> topics;
     topics.push_back(std::string("/scan"));
+    topics.push_back(std::string("/poseupdate"));
+    topics.push_back(std::string("/tf"));
     //topics.push_back(std::string("/solution"));
 
     rosbag::View view(bag, rosbag::TopicQuery(topics));
@@ -59,8 +64,20 @@ int main(int argc, char ** argv) {
     nav_msgs::Odometry odom;
     bool have_odom = false;
 
+    geometry_msgs::Transform base_link;
+    
     for(rosbag::MessageInstance const m: view) {
+
       ++n_msg;
+
+      if(m.isType<tf::tfMessage>()) {
+        tf::tfMessage::ConstPtr new_tf = m.instantiate<tf::tfMessage>();
+        if(new_tf->transforms[0].child_frame_id == "/base_footprint") {
+          base_link = new_tf->transforms[0].transform;
+        }
+        continue;
+      }
+
       
       if(m.isType<nav_msgs::Odometry>())
       {
@@ -101,19 +118,18 @@ int main(int argc, char ** argv) {
             }
             pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
             if(!trace_twist) {
-              cout << elapsed.toSec()  << ", "
-                << (scan->header.stamp-start_time).toSec() << ", "
-                << scan->header.frame_id << ", "
+              cout 
+                << scan->header.seq << ", "
+                << scan->header.stamp.sec << ", "
+                << scan->header.stamp.nsec << ", "
                 << scan->scan_time << ", " 
-                ///<< twist.linear.x << ", "
-                //<< twist.linear.y << ", "
-                //<< twist.angular.z << ", "
                 << matched_pose.get_x()  << ", " 
                 << matched_pose.get_y()  << ", " 
                 << matched_pose.get_theta() << ", " 
                 << pose.get_x() << ", " 
                 << pose.get_y() << ", "  
-                << pose.get_theta() << endl;
+                << pose.get_theta() << ","
+                << bag_path << endl;
             }
 
             last_dx = matched_pose.get_x();
@@ -125,6 +141,14 @@ int main(int argc, char ** argv) {
     }
 
     bag.close();
+
+    cerr << "untwist: " << untwist_timer.get_elapsed_seconds() << endl;
+    cerr << "move_scan: "  << move_scan_timer.get_elapsed_seconds() << endl;
+    cerr << "scan_difference: " <<  scan_difference_timer.get_elapsed_seconds() << endl;
+    cerr << "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl;
+    cerr << "total difference count: " << g_scan_difference_count << endl;
+    cerr << "total wrap count: " << g_wrap_count << endl;
+
 
     return 0;
 

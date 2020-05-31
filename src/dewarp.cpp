@@ -13,6 +13,7 @@
 #define radians2degrees(theta) ((theta) * 180. / EIGEN_PI)
 
 size_t g_wrap_count = 0;
+size_t g_scan_difference_count = 0;
 
 std::default_random_engine random_engine;
 
@@ -441,57 +442,127 @@ inline bool is_ccw(const Point2d<T> & p1, const Point2d<T> & p2) {
     return (p1.x*p2.y-p1.y*p2.x) >= 0;
 }
 
+// use scan2 for "walls"
+template <class T>
+struct Wall {
+    T theta_min;
+    T theta_max;
+    Point2d<T> p1;
+    Point2d<T> p2;
+    bool operator < (const Wall & rhs) {
+        return this->theta_min < rhs.theta_min;
+    }
+};
+
+template <class T>
+vector<Wall<T>> get_sorted_walls(const vector<Point2d<T>> & scan) {
+    vector<Wall<T>> walls;
+    walls.reserve(scan.size()-1);
+    T theta2 = atan2(scan[0].y,scan[0].x);
+    for(int i=0; i < scan.size()-1; ++i) {
+        auto & p1 = scan[i];
+        auto & p2 = scan[i+1];
+        T theta1 = theta2;
+        T theta2 = atan2(p2.y,p2.x);
+
+        walls[i] = (theta1 <= theta2) ? Wall<T>{theta1, theta2, p1, p2} : Wall<T>{theta2, theta1, p2, p1};
+    }
+
+    std::sort(walls.begin(), walls.end());
+    return walls;
+}
+
+
 // computes scan difference of scans without requiring matching equally spaced scan angles
 // tbd whether there is a requirement for increasing scan angles
 template<class T>
 T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & scan2) {
     
     scan_difference_timer.start();
+    ++g_scan_difference_count;
+
     // walk around scan1, finding correspondences in scan2
     T total_difference = 0;
     int points_compared = 0;
 
     // index of rays in scan2 to compare
-    size_t i2a=0;
-    size_t i2b=1;
 
-    const size_t scan2_size = scan2.size();
-    for(auto & p1 : scan1) {
-        if(isnan(p1.x)){
+    // i2a,i2b should point to first non-null wall
+    size_t i2a = 0;
+    size_t i2b = 1;
+    while(isnan(scan2[i2a].x) || isnan(scan2[i2b].x) && (i2b < scan2.size())) {
+        ++i2a;
+        ++i2b;
+    }
+
+    int i1 = 0;
+
+    while( isnan(scan1[i1].x) && i1 < scan1.size() ) {
+        ++i1;
+    }
+
+    auto p1 = scan1[i1];
+    auto p2a = scan2[i2a];
+    auto p2b = scan2[i2b];
+    if(isnan(p1.x) || isnan(p2a.x) || isnan(p2b.x) ) {
+        return 0;
+    }
+
+    while(true) {
+
+        // if p1 is past wall, grab more wall
+        if(is_ccw(p2b, p1)) {
+            do {
+                ++i2b;
+                ++i2a;
+            } while (i2b<scan2.size() && (isnan(scan2[i2b].x) || isnan(scan2[i2a].x)) );
+    
+            if(i2b>=scan2.size()) break; // done if there is no more wall
+            p2b = scan2[i2b];
+            p2a = scan2[i2a];
+
+
             continue;
         }
-        Line<T> l1 = Line<T>::from_points({0,0},p1);
-        // find matching angle
-        bool found = false;
-        for(size_t i = 0; !found && i < scan2_size; ++i) {
-            auto & l2_a = scan2[i2a];
-            auto & l2_b = scan2[i2b];
-            if(!isnan(l2_a.x) && !isnan(l2_b.x) && is_ccw(l2_a, p1) && is_ccw(p1, l2_b)) {
-                Line<T> l2 = Line<T>::from_points(l2_a, l2_b);
-                Point2d<T> p = l1.intersection(l2);
 
-                T dx = p.x-p1.x;
-                T dy = p.y-p1.y;
+        // if wall is past p1, grab more points
+        if(is_ccw(p1, p2a)) {
+            do {
+                ++i1;
+            } while (isnan(scan1[i1].x) && i1<scan1.size());
 
-                // tbd: what is the best difference metric?
-                // total_difference += sqrt(dx*dx+dy*dy);
-                total_difference += fabs(dx)+fabs(dy);
-                ++points_compared;
-                found = true;
-            } else {
-                // increment line2 rays and wrap around if necessary
-                if(++i2a == scan2_size) {
-                    ++g_wrap_count;
-                    i2a = 0;
-                }
-                if(++i2b == scan2_size) {
-                    i2b = 0;
-                }
-            }
+            if(i1 >= scan1.size()) break; // done if there are no more points
+            p1=scan1[i1];
+
+            continue;
         }
+
+        // if we're here, point must be in wall
+
+        // get distance
+        Line<T> l1 = Line<T>::from_points({0,0},p1);
+        Line<T> l2 = Line<T>::from_points(scan2[i2a], scan2[i2b]);
+        Point2d<T> p = l1.intersection(l2);
+
+        T dx = p.x-p1.x;
+        T dy = p.y-p1.y;
+
+        // tbd: what is the best difference metric?
+        // total_difference += sqrt(dx*dx+dy*dy);
+        total_difference += fabs(dx)+fabs(dy);
+        ++points_compared;
+
+        // grab next non-null p1 and continue
+        do {
+            ++i1;
+        } while( isnan(scan1[i1].x) && i1 < scan1.size() );
+
+        if(i1 >= scan1.size()) break; // done if there are no more points
+        p1 = scan1[i1];
+        continue;
+
     }
-    scan_difference_timer.stop();
-    return total_difference / points_compared;
+    return total_difference;
 }
 
 template <class T> void  get_scan_xy(const vector<ScanLine<T>> & scan, vector<Point2d<T>> & scan_xy) {

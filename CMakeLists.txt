@@ -13,6 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   rosbag
   sensor_msgs
+  tf
+  hector_mapping
+  hector_trajectory_server
 
 )
 
@@ -147,6 +150,8 @@ add_executable(jiggle src/jiggle.cpp)
 
 add_executable(process_bag src/process_bag.cpp)
 
+add_executable(get_slam_results src/get_slam_results.cpp)
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -162,6 +167,11 @@ add_executable(process_bag src/process_bag.cpp)
 target_link_libraries(process_bag
   ${catkin_LIBRARIES}
 )
+
+target_link_libraries(get_slam_results
+  ${catkin_LIBRARIES}
+)
+
 
 #############
 ## Install ##
