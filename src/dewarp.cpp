@@ -436,7 +436,9 @@ T prorate(T x, T x1, T x2, T y1, T y2) {
 }
 
 template <class T>
-inline bool is_ccw(const Point2d<T> & p1, const Point2d<T> & p2) {
+inline bool is_ccw(const Point2d<T> & p2, const Point2d<T> & p1) {
+    // returns true if p2 is ccw of p1
+
     // it is ccw if the cross product is positive
     // here we only need to calculate the z term of the cross product
     return (p1.x*p2.y-p1.y*p2.x) >= 0;
@@ -511,7 +513,7 @@ T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & s
     while(true) {
 
         // if p1 is past wall, grab more wall
-        if(is_ccw(p2b, p1)) {
+        if(is_ccw(p1, p2b)) {
             do {
                 ++i2b;
                 ++i2a;
@@ -526,7 +528,7 @@ T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & s
         }
 
         // if wall is past p1, grab more points
-        if(is_ccw(p1, p2a)) {
+        if(is_ccw(p2a, p1)) {
             do {
                 ++i1;
             } while (isnan(scan1[i1].x) && i1<scan1.size());
