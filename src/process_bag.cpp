@@ -101,8 +101,8 @@ int main(int argc, char ** argv) {
       }
       auto elapsed = scan_time - start_time;
 
-      uint32_t scan_factor =10;
-      if((n_scan-1) % scan_factor == 0) {
+      uint32_t scans_per_match = 10;
+      if((n_scan-1) % scans_per_match == 0) {
         float untwist_percent = 1.0;
         last_lines = lines;
         last_scan_xy = scan_xy;
@@ -113,17 +113,17 @@ int main(int argc, char ** argv) {
             //auto & twist = odom.twist.twist;
             auto untwisted = untwist_scan<float>(
                 scan_xy, 
-                untwist_percent*matched_pose.get_x()/scan_factor, 
-                untwist_percent*matched_pose.get_y()/scan_factor, 
-                untwist_percent*matched_pose.get_theta()/scan_factor);
+                untwist_percent*matched_pose.get_x()/scans_per_match, 
+                untwist_percent*matched_pose.get_y()/scans_per_match, 
+                untwist_percent*matched_pose.get_theta()/scans_per_match);
 
             matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
             if(true) {
               untwisted = untwist_scan<float>(
                 scan_xy, 
-                untwist_percent*matched_pose.get_x()/scan_factor, 
-                untwist_percent*matched_pose.get_y()/scan_factor, 
-                untwist_percent*matched_pose.get_theta()/scan_factor);
+                untwist_percent*matched_pose.get_x()/scans_per_match, 
+                untwist_percent*matched_pose.get_y()/scans_per_match, 
+                untwist_percent*matched_pose.get_theta()/scans_per_match);
               matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
             }
             scan_xy = untwisted; // save for next time
