@@ -585,7 +585,7 @@ template <class T> vector<Point2d<T>> get_scan_xy(const vector<ScanLine<T>> & sc
 
 
 template <class T = double>
-Pose<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>> & scan2_xy) {
+Pose<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>> & scan2_xy, Pose<T> guess) {
     match_scans_timer.start();
     vector<Point2d<T>> scan2b;
     scan2b.reserve(scan2_xy.size());
@@ -598,7 +598,7 @@ Pose<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>
         return d;
     };
 
-    MinimizeResult<T> r = minimize<T>({0,0,0}, error_function);
+    MinimizeResult<T> r = minimize<T>({guess.get_x(),guess.get_y(),guess.get_theta()}, error_function);
     Pose<T> match(r.p[0], r.p[1], r.p[2]);
     match_scans_timer.stop();
     return match;

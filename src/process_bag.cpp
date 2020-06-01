@@ -101,8 +101,9 @@ int main(int argc, char ** argv) {
       auto elapsed = scan_time - start_time;
 
       uint32_t scan_factor = 1;
+      Pose<float> matched_pose(0,0,0);
       if((n_scan-1) % scan_factor == 0) {
-        float fudge = 1.0;
+        float untwist_percent = 1.0;
         last_lines = lines;
         last_scan_xy = scan_xy;
         ros_scan_to_scan_lines(*scan, lines);
@@ -110,12 +111,22 @@ int main(int argc, char ** argv) {
 
         if(n_scan > 2) {
             //auto & twist = odom.twist.twist;
-            auto matched_pose = match_scans(last_scan_xy, scan_xy);
+            auto untwisted = untwist_scan<float>(
+                scan_xy, 
+                untwist_percent*matched_pose.get_x()/scan_factor, 
+                untwist_percent*matched_pose.get_y()/scan_factor, 
+                untwist_percent*matched_pose.get_theta()/scan_factor);
+
+            matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
             if(true) {
-              auto untwisted = untwist_scan<float>(scan_xy, fudge*matched_pose.get_x()/scan_factor, 0*fudge*matched_pose.get_y()/scan_factor, 0*fudge*matched_pose.get_theta()/scan_factor);
-              scan_xy = untwisted;
-              matched_pose = match_scans(last_scan_xy, scan_xy);
+              untwisted = untwist_scan<float>(
+                scan_xy, 
+                untwist_percent*matched_pose.get_x()/scan_factor, 
+                untwist_percent*matched_pose.get_y()/scan_factor, 
+                untwist_percent*matched_pose.get_theta()/scan_factor);
+              matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
             }
+            scan_xy = untwisted; // save for next time
             pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
             if(!trace_twist) {
               cout 
