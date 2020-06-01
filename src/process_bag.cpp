@@ -60,6 +60,7 @@ int main(int argc, char ** argv) {
     float last_dx=0;
     float last_dy=0;
     float last_theta = 0;
+    Pose<float> matched_pose(0,0,0);
     
     nav_msgs::Odometry odom;
     bool have_odom = false;
@@ -100,8 +101,7 @@ int main(int argc, char ** argv) {
       }
       auto elapsed = scan_time - start_time;
 
-      uint32_t scan_factor = 1;
-      Pose<float> matched_pose(0,0,0);
+      uint32_t scan_factor =10;
       if((n_scan-1) % scan_factor == 0) {
         float untwist_percent = 1.0;
         last_lines = lines;
