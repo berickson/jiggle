@@ -30,16 +30,90 @@ void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine
 void print_scan(const vector<ScanLine<float>> & lines) {
 }
 
+
+
+class LidarMapper {
+public:  
+
+  bool trace_twist = false;
+  uint32_t n_scan = 0;
+  vector<ScanLine<float>> lines;
+  vector<Point2d<float>> scan_xy;
+  vector<Point2d<float>> last_scan_xy;
+  Pose<float> matched_pose;
+  Pose<float> pose;
+  string bag_path;
+
+  struct Node {
+    Pose<float> pose;
+    vector<Point2d<float>> untwisted_scan;
+  };
+
+  vector<Node> nodes;
+
+
+  void add_scan(sensor_msgs::LaserScan::ConstPtr scan) {
+    uint32_t scans_per_match = 1;
+    ++n_scan;
+    if((n_scan-1) % scans_per_match == 0) {
+      last_scan_xy = scan_xy;
+      ros_scan_to_scan_lines(*scan, lines);
+      scan_xy = get_scan_xy(lines);
+
+      if(n_scan==1) {
+        cout << "frame,sec,nsec,scan_time,dx,dy,dtheta,x,y,theta,bag_path" << endl;
+      } else {
+          //auto & twist = odom.twist.twist;
+          auto untwisted = untwist_scan<float>(
+              scan_xy, 
+              matched_pose.get_x()/scans_per_match, 
+              matched_pose.get_y()/scans_per_match, 
+              matched_pose.get_theta()/scans_per_match);
+
+          matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
+          for(uint32_t i = 0; i < 2; ++i) {
+            untwisted = untwist_scan<float>(
+              scan_xy, 
+              matched_pose.get_x()/scans_per_match, 
+              matched_pose.get_y()/scans_per_match, 
+              matched_pose.get_theta()/scans_per_match);
+            matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
+          }
+
+          scan_xy = untwisted; // save for next time
+          pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
+          if(trace_twist) {
+            cout 
+              << scan->header.seq << ", "
+              << scan->header.stamp.sec << ", "
+              << scan->header.stamp.nsec << ", "
+              << scan->scan_time << ", " 
+              << matched_pose.get_x()  << ", " 
+              << matched_pose.get_y()  << ", " 
+              << matched_pose.get_theta() << ", " 
+              << pose.get_x() << ", " 
+              << pose.get_y() << ", "  
+              << pose.get_theta() << ","
+              << bag_path << endl;
+          }
+          Node node;
+          node.pose = pose;
+          node.untwisted_scan = scan_xy;
+          nodes.emplace_back(node);
+      }
+    }
+  }
+};
+
 int main(int argc, char ** argv) {
 
-    bool trace_twist = false;
+    LidarMapper mapper;
+    mapper.trace_twist = true;
     rosbag::Bag bag;
-    string bag_path = (argc >= 2) ? argv[1]: "/home/brian/lidar_ws/Team_Hector_MappingBox_Dagstuhl_Neubau.bag";
+    string bag_path = (argc >= 2) ? argv[1]: "/home/brian/lidar_ws/around-bar-3-x-2020-06-04-16-46-44.bag";
+    mapper.bag_path = bag_path; // for logging
     uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2],NULL,10): numeric_limits<uint32_t>::max();
 
-    if(!trace_twist) {
-      cout << "frame,sec,nsec,scan_time,dx,dy,dtheta,x,y,theta,bag_path" << endl;
-    }
     bag.open(bag_path);  // BagMode is Read by default
 
     uint32_t n_msg = 0, n_scan = 0;
@@ -51,21 +125,16 @@ int main(int argc, char ** argv) {
     //topics.push_back(std::string("/solution"));
 
     rosbag::View view(bag, rosbag::TopicQuery(topics));
-    vector<ScanLine<float>> lines;
-    vector<ScanLine<float>> last_lines;
-    vector<Point2d<float>> scan_xy;
-    vector<Point2d<float>> last_scan_xy;
 
     Pose<float> pose;
-    float last_dx=0;
-    float last_dy=0;
-    float last_theta = 0;
     Pose<float> matched_pose(0,0,0);
     
     nav_msgs::Odometry odom;
     bool have_odom = false;
 
     geometry_msgs::Transform base_link;
+
+
     
     for(rosbag::MessageInstance const m: view) {
 
@@ -93,62 +162,7 @@ int main(int argc, char ** argv) {
       if(scan==NULL) continue;
       ++n_scan;
       if(n_scan > scan_count_limit) break;
-
-      ros::Time scan_time = m.getTime();
-      static ros::Time start_time;
-      if(n_scan == 1) {
-        start_time = scan_time;
-      }
-      auto elapsed = scan_time - start_time;
-
-      uint32_t scans_per_match = 10;
-      if((n_scan-1) % scans_per_match == 0) {
-        float untwist_percent = 1.0;
-        last_lines = lines;
-        last_scan_xy = scan_xy;
-        ros_scan_to_scan_lines(*scan, lines);
-        scan_xy = get_scan_xy(lines);
-
-        if(n_scan > 2) {
-            //auto & twist = odom.twist.twist;
-            auto untwisted = untwist_scan<float>(
-                scan_xy, 
-                untwist_percent*matched_pose.get_x()/scans_per_match, 
-                untwist_percent*matched_pose.get_y()/scans_per_match, 
-                untwist_percent*matched_pose.get_theta()/scans_per_match);
-
-            matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
-            if(true) {
-              untwisted = untwist_scan<float>(
-                scan_xy, 
-                untwist_percent*matched_pose.get_x()/scans_per_match, 
-                untwist_percent*matched_pose.get_y()/scans_per_match, 
-                untwist_percent*matched_pose.get_theta()/scans_per_match);
-              matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
-            }
-            scan_xy = untwisted; // save for next time
-            pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
-            if(!trace_twist) {
-              cout 
-                << scan->header.seq << ", "
-                << scan->header.stamp.sec << ", "
-                << scan->header.stamp.nsec << ", "
-                << scan->scan_time << ", " 
-                << matched_pose.get_x()  << ", " 
-                << matched_pose.get_y()  << ", " 
-                << matched_pose.get_theta() << ", " 
-                << pose.get_x() << ", " 
-                << pose.get_y() << ", "  
-                << pose.get_theta() << ","
-                << bag_path << endl;
-            }
-
-            last_dx = matched_pose.get_x();
-            last_dy = matched_pose.get_y();
-            last_theta = matched_pose.get_theta();
-        }
-      }
-
+      mapper.add_scan(scan);
     }
 
     bag.close();
