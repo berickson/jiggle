@@ -30,26 +30,54 @@ void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine
 void print_scan(const vector<ScanLine<float>> & lines) {
 }
 
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/topological_sort.hpp>
 
-
+  
 class LidarMapper {
 public:  
 
-  bool trace_twist = false;
   uint32_t n_scan = 0;
   vector<ScanLine<float>> lines;
   vector<Point2d<float>> scan_xy;
   vector<Point2d<float>> last_scan_xy;
-  Pose<float> matched_pose;
+  Pose<float> diff;
   Pose<float> pose;
   string bag_path;
 
   struct Node {
+    std_msgs::Header header;
     Pose<float> pose;
+    ScanMatch<float> match;
     vector<Point2d<float>> untwisted_scan;
   };
 
+  typedef boost::adjacency_list<
+      boost::listS, boost::vecS, boost::bidirectionalS,
+      Node, ScanMatch<float>>
+    Map;
+
+
   vector<Node> nodes;
+
+  void write_path_csv(std::ostream & o) {
+    cout << "frame,sec,nsec,dx,dy,dtheta,x,y,theta,bag_path" << endl;
+
+    for(auto & node : nodes ){
+      o 
+        << node.header.seq << ", "
+        << node.header.stamp.sec << ", "
+        << node.header.stamp.nsec << ", "
+        << node.match.delta.get_x()  << ", " 
+        << node.match.delta.get_y()  << ", " 
+        << node.match.delta.get_theta() << ", " 
+        << node.pose.get_x() << ", " 
+        << node.pose.get_y() << ", "  
+        << node.pose.get_theta() << ","
+        << bag_path << endl;
+    }
+  }
 
 
   void add_scan(sensor_msgs::LaserScan::ConstPtr scan) {
@@ -60,43 +88,32 @@ public:
       ros_scan_to_scan_lines(*scan, lines);
       scan_xy = get_scan_xy(lines);
 
-      if(n_scan==1) {
-        cout << "frame,sec,nsec,scan_time,dx,dy,dtheta,x,y,theta,bag_path" << endl;
-      } else {
+      if(n_scan>1) {
           //auto & twist = odom.twist.twist;
           auto untwisted = untwist_scan<float>(
               scan_xy, 
-              matched_pose.get_x()/scans_per_match, 
-              matched_pose.get_y()/scans_per_match, 
-              matched_pose.get_theta()/scans_per_match);
+              diff.get_x()/scans_per_match, 
+              diff.get_y()/scans_per_match, 
+              diff.get_theta()/scans_per_match);
 
-          matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
+          auto m = match_scans(last_scan_xy, untwisted, diff);
+          diff = m.delta;
           for(uint32_t i = 0; i < 2; ++i) {
             untwisted = untwist_scan<float>(
               scan_xy, 
-              matched_pose.get_x()/scans_per_match, 
-              matched_pose.get_y()/scans_per_match, 
-              matched_pose.get_theta()/scans_per_match);
-            matched_pose = match_scans(last_scan_xy, untwisted, matched_pose);
+              diff.get_x()/scans_per_match, 
+              diff.get_y()/scans_per_match, 
+              diff.get_theta()/scans_per_match);
+
+            m = match_scans(last_scan_xy, untwisted, diff);
+            diff = m.delta;
           }
 
           scan_xy = untwisted; // save for next time
-          pose.move({matched_pose.get_x(), matched_pose.get_y()}, matched_pose.get_theta());
-          if(trace_twist) {
-            cout 
-              << scan->header.seq << ", "
-              << scan->header.stamp.sec << ", "
-              << scan->header.stamp.nsec << ", "
-              << scan->scan_time << ", " 
-              << matched_pose.get_x()  << ", " 
-              << matched_pose.get_y()  << ", " 
-              << matched_pose.get_theta() << ", " 
-              << pose.get_x() << ", " 
-              << pose.get_y() << ", "  
-              << pose.get_theta() << ","
-              << bag_path << endl;
-          }
+          pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
           Node node;
+          node.header = scan->header;
+          node.match = m;
           node.pose = pose;
           node.untwisted_scan = scan_xy;
           nodes.emplace_back(node);
@@ -108,7 +125,6 @@ public:
 int main(int argc, char ** argv) {
 
     LidarMapper mapper;
-    mapper.trace_twist = true;
     rosbag::Bag bag;
     string bag_path = (argc >= 2) ? argv[1]: "/home/brian/lidar_ws/around-bar-3-x-2020-06-04-16-46-44.bag";
     mapper.bag_path = bag_path; // for logging
@@ -165,6 +181,8 @@ int main(int argc, char ** argv) {
       mapper.add_scan(scan);
     }
 
+    // mapper.write_path_csv(cout);
+
     bag.close();
 
     cerr << "untwist: " << untwist_timer.get_elapsed_seconds() << endl;
@@ -173,6 +191,26 @@ int main(int argc, char ** argv) {
     cerr << "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl;
     cerr << "total difference count: " << g_scan_difference_count << endl;
     cerr << "total wrap count: " << g_wrap_count << endl;
+
+    /*
+    Test 1: Pick a 5 equally spaced scans to test with, 
+    for each one, compare with all other scans, 
+    note the match scores, and figure out if there
+    is an accuracy pattern, use this to determine a
+    good cut-off score for matches.    
+    */
+
+
+   cout << "percent,score,seq1,seq2,dx,dy,dtheta" << endl;
+   for(float percent: {0.0, 0.2, 0.4, 0.6, 0.8}) {
+     auto node1 = mapper.nodes[mapper.nodes.size() * percent];
+     for(auto node2 : mapper.nodes) {
+       auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, Pose<float>(0,0,0));
+       auto & delta = m.delta;
+       cout << percent << "," << m.score << "," << node1.header.seq << "," << node2.header.seq << "," <<  delta.get_x() << "," << delta.get_y() << ", " << delta.get_theta() << endl;
+     }
+   }
+    
 
 
     return 0;
