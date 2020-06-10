@@ -19,18 +19,26 @@ struct Pose {
     double theta = NAN;
 };
 
+// Boost gibberish to make Pose into a property
+struct PosePropertyTag
+{
+    typedef boost::edge_property_tag kind;
+    static std::size_t const num;
+};
+std::size_t const PosePropertyTag::num = (std::size_t)&PosePropertyTag::num;
+
+
 struct PoseDelta {
-    uint32_t from;
-    uint32_t to;
     double r = NAN;
     double theta = NAN;
     double phi = NAN;
 };
 
+// Boost gibberish to make PoseDelta into a property
 struct PoseDeltaPropertyTag
 {
     typedef boost::edge_property_tag kind;
-    static std::size_t const num; // ???
+    static std::size_t const num;
 };
 std::size_t const PoseDeltaPropertyTag::num = (std::size_t)&PoseDeltaPropertyTag::num;
 
@@ -55,10 +63,9 @@ int main() {
     typedef  property<PoseDeltaPropertyTag,PoseDelta> edge_delta_type;
     typedef adjacency_list<vecS, vecS, bidirectionalS, no_property, edge_delta_type > Graph;
     Graph g;
+    /*
     auto edge = add_edge(0,2,g);
-    //auto delta_map = get(pose_delta, g);
-    //put(delta_map, edge,PoseDelta{1,1,1});
-    auto result = add_edge(0,1,PoseDelta{0,0,1,2,3},g);
+    auto result = add_edge(0,1,PoseDelta{1,2,3},g);
     PoseDelta d = get (PoseDeltaPropertyTag (), g, result.first);
     cout << "Edge delta was: " << d.r << ", " << d.theta << ", " << d.phi << endl;
     add_edge(2,3,g);
@@ -81,19 +88,19 @@ int main() {
     std::cout << std::endl;
     // ...
     return 0;
+    */
 
     vector <Pose> poses;
     vector <PoseDelta> deltas;
 
-    poses.resize(3);
-    deltas = {
-        {0, 1, distance(2.5,5), atan2(2.5,5), 0},
-        {0, 2, distance(4.4,2), atan2(4.4,2), 0},
-        {2, 1, distance(3.1,2), atan2(-2,3.1), 0}
-    };
+    add_edge(0, 1, PoseDelta{distance(2.5,5), atan2(2.5,5), 0}, g);
+    add_edge(0, 2, PoseDelta{distance(4.4,2), atan2(4.4,2), 0}, g);
+    add_edge(2, 1, PoseDelta{distance(3.1,2), atan2(-2,3.1), 0}, g);
+
 
     // Assign P0 a fixed pose estimate of {0, 0, 0}
     // All other poses have no estimates
+    poses.resize(3);
     poses[0] = {0, 0, 0};
     // A pose is estimable if it shares an edge with an estimated pose - and isn't fixed (it could already have an estimate)
 
@@ -105,16 +112,15 @@ int main() {
             double sum_x = 0;
             double sum_y = 0;
             double sum_theta = 0;
-            for(auto & delta : deltas) {
+            for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
                 // edge to our edge
-                if(delta.to == i) {
-                    Pose & from_pose = poses[delta.from];
-                    if(from_pose.x != NAN) {
-                        sum_x += from_pose.x + sin(from_pose.theta + delta.theta) * delta.r;
-                        sum_y += from_pose.y + cos(from_pose.theta + delta.theta) * delta.r;
-                        sum_theta += from_pose.theta + delta.phi;
-                        ++n_estimates;
-                    }
+                PoseDelta delta = get(PoseDeltaPropertyTag (), g, *ep.first);
+                Pose & from_pose = poses[ep.first->m_source]; 
+                if(from_pose.x != NAN) {
+                    sum_x += from_pose.x + sin(from_pose.theta + delta.theta) * delta.r;
+                    sum_y += from_pose.y + cos(from_pose.theta + delta.theta) * delta.r;
+                    sum_theta += from_pose.theta + delta.phi;
+                    ++n_estimates;
                 }
             }
             if(n_estimates > 0) {
