@@ -19,15 +19,6 @@ struct Pose {
     double theta = NAN;
 };
 
-// Boost gibberish to make Pose into a property
-struct PosePropertyTag
-{
-    typedef boost::edge_property_tag kind;
-    static std::size_t const num;
-};
-std::size_t const PosePropertyTag::num = (std::size_t)&PosePropertyTag::num;
-
-
 struct PoseDelta {
     double r = NAN;
     double theta = NAN;
@@ -46,12 +37,6 @@ double distance(double x, double y) {
     return sqrt(x*x+y*y);
 }
 
-void print_poses(const vector<Pose> & poses) {
-    cout << "     x,     y, theta" << endl;
-    for(auto & pose : poses) {
-        cout << std::setw(6) << pose.x << "," << std::setw(6) << pose.y << "," << std::setw(6) << pose.theta << endl;
-    }
-}
 
 using namespace boost;
 
@@ -60,35 +45,9 @@ int main() {
 
     // help on properties
     // https://stackoverflow.com/a/7953988/383967
-    typedef  property<PoseDeltaPropertyTag,PoseDelta> edge_delta_type;
-    typedef adjacency_list<vecS, vecS, bidirectionalS, no_property, edge_delta_type > Graph;
+    typedef  property<PoseDeltaPropertyTag,PoseDelta> edge_pose_delta_t;
+    typedef adjacency_list<vecS, vecS, bidirectionalS, Pose, edge_pose_delta_t > Graph;
     Graph g;
-    /*
-    auto edge = add_edge(0,2,g);
-    auto result = add_edge(0,1,PoseDelta{1,2,3},g);
-    PoseDelta d = get (PoseDeltaPropertyTag (), g, result.first);
-    cout << "Edge delta was: " << d.r << ", " << d.theta << ", " << d.phi << endl;
-    add_edge(2,3,g);
-    add_edge(1,3,g);
-
-    // get the property map for vertex indices
-    typedef property_map<Graph, vertex_index_t>::type IndexMap;
-    IndexMap index = get(vertex_index, g);
-
-    std::cout << "vertices(g) = ";
-    for (auto vp = vertices(g); vp.first != vp.second; ++vp.first) {
-        std::cout << index[*vp.first] <<  ":";
-        for(auto ep = out_edges(*vp.first, g); ep.first != ep.second; ++ep.first) {
-            cout << *ep.first << " ";
-        }
-    }
-    cout << endl;
-
-      
-    std::cout << std::endl;
-    // ...
-    return 0;
-    */
 
     vector <Pose> poses;
     vector <PoseDelta> deltas;
@@ -100,14 +59,13 @@ int main() {
 
     // Assign P0 a fixed pose estimate of {0, 0, 0}
     // All other poses have no estimates
-    poses.resize(3);
-    poses[0] = {0, 0, 0};
+    g[0] = Pose{0, 0, 0};
     // A pose is estimable if it shares an edge with an estimated pose - and isn't fixed (it could already have an estimate)
 
     // until converged:
     // for all estimable poses
     for(int pass = 0; pass< 10; ++pass) {
-        for(int i = 1; i < poses.size(); ++i) {
+        for(int i = 1; i < num_vertices(g); ++i) {
             uint32_t n_estimates = 0;
             double sum_x = 0;
             double sum_y = 0;
@@ -115,7 +73,7 @@ int main() {
             for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
                 // edge to our edge
                 PoseDelta delta = get(PoseDeltaPropertyTag (), g, *ep.first);
-                Pose & from_pose = poses[ep.first->m_source]; 
+                Pose & from_pose = g[ep.first->m_source]; 
                 if(from_pose.x != NAN) {
                     sum_x += from_pose.x + sin(from_pose.theta + delta.theta) * delta.r;
                     sum_y += from_pose.y + cos(from_pose.theta + delta.theta) * delta.r;
@@ -127,7 +85,7 @@ int main() {
                 // estimate = average calculated pose from connected poses
                 // pose is now estimated
 
-                Pose & pose = poses[i];
+                Pose & pose = g[i];
                 pose.x = sum_x / n_estimates;
                 pose.y = sum_y / n_estimates;
                 pose.theta = sum_theta / n_estimates;
@@ -136,7 +94,13 @@ int main() {
 
 
         cout << "pass: " << pass << endl;
-        print_poses(poses);
+        // print_poses(poses);
+        cout << "     x,     y, theta" << endl;
+        for(int i = 0; i < num_vertices(g); ++ i) {
+            Pose& pose = g[i];
+            cout << std::setw(6) << pose.x << "," << std::setw(6) << pose.y << "," << std::setw(6) << pose.theta << endl;
+        }
+
         cout << endl;
     }
 
