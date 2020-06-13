@@ -73,16 +73,19 @@ int main(int argc, char ** argv) {
       mapper.add_scan(scan);
     }
 
-    // mapper.write_path_csv(cout);
-
-    bag.close();
-
+  
     cerr << "untwist: " << untwist_timer.get_elapsed_seconds() << endl;
     cerr << "move_scan: "  << move_scan_timer.get_elapsed_seconds() << endl;
     cerr << "scan_difference: " <<  scan_difference_timer.get_elapsed_seconds() << endl;
     cerr << "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl;
     cerr << "total difference count: " << g_scan_difference_count << endl;
     cerr << "total wrap count: " << g_wrap_count << endl;
+
+    bag.close();
+
+    mapper.write_path_csv(cout);
+    return 0;
+
 
     /*
     Test 1: Pick a 5 equally spaced scans to test with, 

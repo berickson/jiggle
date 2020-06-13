@@ -8,6 +8,9 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topological_sort.hpp>
 
+inline float distance(float dx, float dy) {
+  return sqrt(dx*dx+dy*dy);
+}
 
 // converts ros message to format compatible with dewarp
 inline void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine<float>> & lines) {
@@ -39,7 +42,6 @@ public:
   struct Node {
     std_msgs::Header header;
     Pose<float> pose;
-    ScanMatch<float> match;
     vector<Point2d<float>> untwisted_scan;
   };
 
@@ -53,19 +55,26 @@ public:
   //vector<Node> nodes;
 
   void write_path_csv(std::ostream & o) {
-    cout << "frame,sec,nsec,dx,dy,dtheta,x,y,theta,bag_path" << endl;
+    cout << "frame,sec,nsec,score,r,dx,dy,dtheta,x,y,theta,bag_path" << endl;
 
     for(auto vd : boost::make_iterator_range(vertices(pose_graph)) ){
       auto & node = pose_graph[vd];
+      ScanMatch<float> match;
+      if(boost::in_degree(vd, pose_graph) > 0) {
+        auto range = boost::in_edges(vd, pose_graph);
+        match = pose_graph[*range.first];
+      }
       o 
-        << node.header.seq << ", "
-        << node.header.stamp.sec << ", "
-        << node.header.stamp.nsec << ", "
-        << node.match.delta.get_x()  << ", " 
-        << node.match.delta.get_y()  << ", " 
-        << node.match.delta.get_theta() << ", " 
-        << node.pose.get_x() << ", " 
-        << node.pose.get_y() << ", "  
+        << node.header.seq << ","
+        << node.header.stamp.sec << ","
+        << node.header.stamp.nsec << ","
+        << match.score  << "," 
+        << distance(match.delta.get_x(), match.delta.get_y()) << ","
+        << match.delta.get_x()  << "," 
+        << match.delta.get_y()  << "," 
+        << match.delta.get_theta() << "," 
+        << node.pose.get_x() << "," 
+        << node.pose.get_y() << ","  
         << node.pose.get_theta() << ","
         << bag_path << endl;
     }
@@ -74,13 +83,19 @@ public:
 
   void add_scan(sensor_msgs::LaserScan::ConstPtr scan) {
     uint32_t scans_per_match = 1;
-    ++n_scan;
-    if((n_scan-1) % scans_per_match == 0) {
-      last_scan_xy = scan_xy;
-      ros_scan_to_scan_lines(*scan, lines);
-      scan_xy = get_scan_xy(lines);
+    ros_scan_to_scan_lines(*scan, lines);
+    scan_xy = get_scan_xy(lines);
 
-      if(n_scan>1) {
+    auto v = boost::add_vertex(pose_graph);
+    Node & node = pose_graph[v];
+    node.header = scan->header;
+    node.pose = pose;
+    pose_graph[v] = node;
+
+
+    if(n_scan % scans_per_match == 0) {
+
+      if(n_scan>0) {
           //auto & twist = odom.twist.twist;
           auto untwisted = untwist_scan<float>(
               scan_xy, 
@@ -103,16 +118,16 @@ public:
 
           scan_xy = untwisted; // save for next time
           pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
-          Node node;
-          node.header = scan->header;
-          node.match = m;
-          node.pose = pose;
-          node.untwisted_scan = scan_xy;
+          auto e = boost::add_edge(v-scans_per_match,v, m ,pose_graph);
+        
           // nodes.emplace_back(node);
-          auto v = boost::add_vertex(pose_graph);
-          pose_graph[v] = node;
           //pose_graph[pose_graph.m_vertices.size()] = node;
       }
+      last_scan_xy = scan_xy;
+
     }
+    node.untwisted_scan = scan_xy;
+
+    ++n_scan;
   }
 };
