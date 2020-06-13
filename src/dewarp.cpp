@@ -95,6 +95,27 @@ public:
         update_trig();
     }
 
+    // returns pose from this pose to p2.  p2-p1.
+    Pose relative_pose_to(Pose p2) {
+        // calculate world difference
+        Pose & p1 = *this;
+        T dx = p2.x - p1.x;
+        T dy = p2.y - p1.y;
+        T theta=atan2(dy,dx);
+        T r = sqrt(dy*dy+dx*dx);
+
+        // Pose rv in terms of p1
+        T theta_rel = theta-p1.theta;
+        Pose rv;
+        rv.x = cos(theta_rel)*r;
+        rv.y = sin(theta_rel)*r;
+        rv.theta = p2.theta - p1.theta;
+        rv.update_trig();
+        return rv;
+        
+
+    }
+
     inline void  Pose2World(const Point2d<T> & p, Point2d<T> & rv) const {
         rv.x = p.x * cos_theta - p.y * sin_theta + x;
         rv.y = p.x * sin_theta + p.y * cos_theta + y;
@@ -112,6 +133,7 @@ public:
     Eigen::Transform<T,2,Eigen::Affine> World2PoseTransform() const {
         return Pose2WorldTransform().inverse();
     }
+
 };
 
 

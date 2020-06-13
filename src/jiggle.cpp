@@ -25,14 +25,6 @@ struct PoseDelta {
     double phi = NAN;
 };
 
-// Boost gibberish to make PoseDelta into a property
-struct PoseDeltaPropertyTag
-{
-    typedef boost::edge_property_tag kind;
-    static std::size_t const num;
-};
-std::size_t const PoseDeltaPropertyTag::num = (std::size_t)&PoseDeltaPropertyTag::num;
-
 double distance(double x, double y) {
     return sqrt(x*x+y*y);
 }
@@ -41,18 +33,17 @@ double distance(double x, double y) {
 using namespace boost;
 
 int main() {
-    enum pose_delta_t{pose_delta};
 
     // help on properties
     // https://stackoverflow.com/a/7953988/383967
-    typedef  property<PoseDeltaPropertyTag,PoseDelta> edge_pose_delta_t;
-    typedef adjacency_list<vecS, vecS, bidirectionalS, Pose, edge_pose_delta_t > Graph;
-    Graph g;
+    typedef adjacency_list<vecS, vecS, bidirectionalS, Pose, PoseDelta > PoseGraph;
+    PoseGraph g;
 
     vector <Pose> poses;
     vector <PoseDelta> deltas;
 
     add_edge(0, 1, PoseDelta{distance(2.5,5), atan2(2.5,5), 0}, g);
+    add_edge(0, 1, PoseDelta{distance(2.4,5), atan2(2.4,5), 0}, g);
     add_edge(0, 2, PoseDelta{distance(4.4,2), atan2(4.4,2), 0}, g);
     add_edge(2, 1, PoseDelta{distance(3.1,2), atan2(-2,3.1), 0}, g);
 
@@ -72,7 +63,7 @@ int main() {
             double sum_theta = 0;
             for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
                 // edge to our edge
-                PoseDelta delta = get(PoseDeltaPropertyTag (), g, *ep.first);
+                PoseDelta & delta = g[*ep.first];
                 Pose & from_pose = g[ep.first->m_source]; 
                 if(from_pose.x != NAN) {
                     sum_x += from_pose.x + sin(from_pose.theta + delta.theta) * delta.r;
@@ -98,7 +89,7 @@ int main() {
         cout << "     x,     y, theta" << endl;
         for(int i = 0; i < num_vertices(g); ++ i) {
             Pose& pose = g[i];
-            cout << std::setw(6) << pose.x << "," << std::setw(6) << pose.y << "," << std::setw(6) << pose.theta << endl;
+            cout << std::setw(6)  << std::setprecision(4) << pose.x << "," << std::setw(6) << std::setprecision(4) << pose.y << "," << std::setw(6) << pose.theta << endl;
         }
 
         cout << endl;
