@@ -1,10 +1,15 @@
+
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <std_msgs/Int32.h>
+#include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/tfMessage.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <geometry_msgs/PoseArray.h>
 
 #include <iomanip>
 
@@ -24,6 +29,10 @@ int main(int argc, char ** argv) {
 
     bag.open(bag_path);  // BagMode is Read by default
 
+    rosbag::Bag out_bag;
+    out_bag.open("out.bag", rosbag::bagmode::Write);
+
+
     uint32_t n_msg = 0, n_scan = 0;
 
     std::vector<std::string> topics;
@@ -41,6 +50,8 @@ int main(int argc, char ** argv) {
     bool have_odom = false;
 
     geometry_msgs::Transform base_link;
+
+    geometry_msgs::PoseArray pose_array;
 
 
     
@@ -71,6 +82,49 @@ int main(int argc, char ** argv) {
       ++n_scan;
       if(n_scan > scan_count_limit) break;
       mapper.add_scan(scan);
+      
+
+      // publish pose_array 
+      {
+        pose_array.header = scan->header;
+        ros::Time time(scan->header.stamp);
+
+        // populate the pose graph
+        auto & v = mapper.pose_graph.m_vertices;
+        auto & poses = pose_array.poses;
+        poses.resize(v.size());
+        tf2::Quaternion quaternion;
+        for(size_t i = 0; i < v.size(); ++i) {
+          auto & pose = v[i].m_property.pose;
+          poses[i].position.x = pose.get_x();
+          poses[i].position.y = pose.get_y();
+          poses[i].position.z = 0;
+          quaternion.setRPY(0,0,pose.get_theta());
+          poses[i].orientation.x = quaternion.x();
+          poses[i].orientation.y = quaternion.y();
+          poses[i].orientation.z = quaternion.z();
+          poses[i].orientation.w = quaternion.w();
+        }
+
+        out_bag.write("/calculated_path",  time, pose_array);
+      }
+
+      // publish untwisted as a point cloud
+      {
+        sensor_msgs::PointCloud point_cloud;
+        ros::Time time(scan->header.stamp);
+        point_cloud.channels.resize(0);
+        point_cloud.header = scan->header;
+        auto & untwisted_scan = mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size()-1].m_property.untwisted_scan;
+        point_cloud.points.resize(untwisted_scan.size());
+        for(uint32_t i = 0; i < untwisted_scan.size(); ++i) {
+          point_cloud.points[i].x = untwisted_scan[i].x;
+          point_cloud.points[i].y = untwisted_scan[i].y;
+          point_cloud.points[i].z = 0;
+        }
+        out_bag.write("/untwisted_scan",  time, point_cloud);
+      }
+
     }
 
   
