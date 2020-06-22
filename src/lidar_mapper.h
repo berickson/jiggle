@@ -8,6 +8,8 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topological_sort.hpp>
 
+#include <fstream>
+
 inline float distance(float dx, float dy) {
   return sqrt(dx*dx+dy*dy);
 }
@@ -130,4 +132,68 @@ public:
 
     ++n_scan;
   }
+
+  void write_g2o() {
+    
+    std::ofstream f ("/home/brian/g2o/bin/path.g2o");
+    auto & g = pose_graph;
+    for(int i = 1; i < num_vertices(g); ++i) {
+      for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
+        const auto & e = *ep.first;
+        const ScanMatch<float> & match = g[e];
+        const char * info = "1 0 0 1 0 1"; // upper diagonal of 3x3 information matrix 
+        
+        
+    
+        
+        f << "EDGE_SE2" << " "  <<  e.m_source << " " << e.m_target  << " " <<   match.delta.get_x() << " " <<   match.delta.get_y() << " " <<   match.delta.get_theta() << " " << info<< endl;
+        
+      }
+    }
+    f << "FIX 0" << endl;
+  }
+
+  void jiggle() {
+    auto & g = pose_graph;
+    for(int pass = 0; pass< 100; ++pass) {
+        for(int i = 1; i < num_vertices(g); ++i) {
+            uint32_t n_estimates = 0;
+            double sum_x = 0;
+            double sum_y = 0;
+            double sum_theta = 0;
+            for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
+                // edge to our edge
+                
+                Pose<float> & delta = g[*ep.first].delta;
+                Polar<float> delta_polar = delta.get_polar();
+                Pose<float> & from_pose = g[ep.first->m_source].pose; 
+                if(from_pose.get_x() != NAN) {
+                    sum_x += from_pose.get_x() + cos(from_pose.get_theta() + delta_polar.theta) * delta_polar.r;
+                    sum_y += from_pose.get_y() + sin(from_pose.get_theta() + delta_polar.theta) * delta_polar.r;
+                    sum_theta += from_pose.get_theta() + delta.get_theta();
+                    ++n_estimates;
+                }
+            }
+            if(n_estimates > 0) {
+                // estimate = average calculated pose from connected poses
+                // pose is now estimated
+                g[i].pose = Pose<float>(sum_x / n_estimates, sum_y / n_estimates, sum_theta / n_estimates);
+            }
+        }
+
+
+        // cout << "pass: " << pass << endl;
+        // // print_poses(poses);
+        // cout << "     x,     y, theta" << endl;
+        // for(int i = 0; i < num_vertices(g); ++ i) {
+        //     Pose& pose = g[i];
+        //     cout << std::setw(6)  << std::setprecision(4) << pose.x << "," << std::setw(6) << std::setprecision(4) << pose.y << "," << std::setw(6) << pose.theta << endl;
+        // }
+
+        // cout << endl;
+
+    }
+
+  }
+
 };

@@ -60,8 +60,13 @@ public:
     }
 };
 
+template <class T=float>
+struct Polar {
+    T r;
+    T theta;
+};
 
-template <class T=double>
+template <class T=float>
 class Pose
 {
 private:
@@ -75,6 +80,12 @@ public:
     inline T get_x() const { return x; }
     inline T get_y()  const { return y; }
     inline T get_theta()  const { return theta; }
+    inline Polar<T> get_polar() const {
+        Polar<T> p;
+        p.r = sqrt(x*x+y*y);
+        p.theta = atan2(y,x);
+        return p;
+    }
 
     void update_trig() {
         cos_theta = cos(theta);

@@ -137,8 +137,46 @@ int main(int argc, char ** argv) {
 
     bag.close();
 
-    mapper.write_path_csv(cout);
-    return 0;
+    // Try manually adding loop from scan at index 175 to 112 (around bar dataset)
+    if(1)
+    {
+      vector<pair<size_t,size_t>> closures;
+    // dx 0.0752851	dy -0.0476339	 dtheta -6.41287
+      //for(auto closure : vector<pair<size_t,size_t>> {{175,112}, {159,0}}) {
+      //  auto index1 = closure.first;
+      //  auto index2 = closure.second;
+      
+      for(int i = 0; i < 1000; ++i) {
+        size_t index1 = rand() % mapper.pose_graph.m_vertices.size();
+        size_t index2 = rand() % mapper.pose_graph.m_vertices.size();
+        if(index1 == index2) continue;
+
+
+        auto node1 = mapper.pose_graph.m_vertices[index1].m_property;
+        auto node2 = mapper.pose_graph.m_vertices[index2].m_property;
+        auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
+        if(m.score < -100) {
+          cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score << endl;
+          auto e = boost::add_edge(index1, index2, m, mapper.pose_graph);
+        }
+      }
+
+      // jiggle the graph
+      //cerr << "jiggling the loops" << endl;
+      //mapper.jiggle();
+
+      mapper.write_g2o();
+      return 0;
+
+    
+      
+    }
+
+
+    if(0) {
+      mapper.write_path_csv(cout);
+      return 0;
+    }
 
 
     /*
@@ -150,16 +188,20 @@ int main(int argc, char ** argv) {
     */
 
 
-   cout << "percent,score,seq1,seq2,dx,dy,dtheta" << endl;
+   cout << "percent,score,index1,index2,seq1,seq2,d,dx,dy,dtheta" << endl;
    for(float percent: {0.0, 0.2, 0.4, 0.6, 0.8}) {
-     auto node1 = mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size() * percent].m_property;
+     size_t index1 = mapper.pose_graph.m_vertices.size() * percent;
+     auto node1 = mapper.pose_graph.m_vertices[index1].m_property;
      
      //auto node1=mapper.pose_graph[node1_id];
-     for(auto v2 : mapper.pose_graph.m_vertices) {
-       auto node2 = v2.m_property;
+     for(size_t index2 = 0; index2 < mapper.pose_graph.m_vertices.size(); ++index2) {
+       auto node2 = mapper.pose_graph.m_vertices[index2].m_property;
        auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, node1.pose.relative_pose_to(node2.pose));
        auto & delta = m.delta;
-       cout << percent << "," << m.score << "," << node1.header.seq << "," << node2.header.seq << "," <<  delta.get_x() << "," << delta.get_y() << ", " << delta.get_theta() << endl;
+       float dx = delta.get_x();
+       float dy = delta.get_y();
+       float d = sqrt(dx*dx+dy*dy);
+       cout << percent << "," << m.score << "," << index1 << "," << index2 << "," << node1.header.seq << "," << node2.header.seq << "," <<  d << "," <<  dx << "," << dy << ", " << delta.get_theta() << endl;
      }
    }
     
