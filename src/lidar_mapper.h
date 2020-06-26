@@ -85,17 +85,17 @@ public:
 
   void add_scan(sensor_msgs::LaserScan::ConstPtr scan) {
     uint32_t scans_per_match = 1;
-    ros_scan_to_scan_lines(*scan, lines);
-    scan_xy = get_scan_xy(lines);
-
-    auto v = boost::add_vertex(pose_graph);
-    Node & node = pose_graph[v];
-    node.header = scan->header;
-    node.pose = pose;
-    pose_graph[v] = node;
 
 
     if(n_scan % scans_per_match == 0) {
+      ros_scan_to_scan_lines(*scan, lines);
+      scan_xy = get_scan_xy(lines);
+
+      auto v = boost::add_vertex(pose_graph);
+      Node & node = pose_graph[v];
+      node.header = scan->header;
+      node.pose = pose;
+      pose_graph[v] = node;
 
       if(n_scan>0) {
           //auto & twist = odom.twist.twist;
@@ -120,15 +120,14 @@ public:
 
           scan_xy = untwisted; // save for next time
           pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
-          auto e = boost::add_edge(v-scans_per_match,v, m ,pose_graph);
+          auto e = boost::add_edge(v-1,v, m ,pose_graph);
         
           // nodes.emplace_back(node);
           //pose_graph[pose_graph.m_vertices.size()] = node;
       }
       last_scan_xy = scan_xy;
-
+      node.untwisted_scan = scan_xy;
     }
-    node.untwisted_scan = scan_xy;
 
     ++n_scan;
   }

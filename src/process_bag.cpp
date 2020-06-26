@@ -18,6 +18,9 @@
 using namespace std;
 
 
+int min_max_rand(int min, int max) {
+  return min + rand() % (max-min) ;
+}
 
 int main(int argc, char ** argv) {
 
@@ -140,21 +143,26 @@ int main(int argc, char ** argv) {
     // Try manually adding loop from scan at index 175 to 112 (around bar dataset)
     if(1)
     {
+      cerr << "calculating closures" << endl;
       vector<pair<size_t,size_t>> closures;
     // dx 0.0752851	dy -0.0476339	 dtheta -6.41287
       //for(auto closure : vector<pair<size_t,size_t>> {{175,112}, {159,0}}) {
       //  auto index1 = closure.first;
       //  auto index2 = closure.second;
       
-      for(int i = 0; i < 1000; ++i) {
+      for(int i = 0; i < 500; ++i) {
         size_t index1 = rand() % mapper.pose_graph.m_vertices.size();
         size_t index2 = rand() % mapper.pose_graph.m_vertices.size();
+        //size_t index1 = min_max_rand(mapper.pose_graph.m_vertices.size() * 2 / 3,mapper.pose_graph.m_vertices.size());
+        //size_t index2 = min_max_rand(0,mapper.pose_graph.m_vertices.size() / 3);
+
         if(index1 == index2) continue;
 
 
         auto node1 = mapper.pose_graph.m_vertices[index1].m_property;
         auto node2 = mapper.pose_graph.m_vertices[index2].m_property;
         auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
+        cerr << index1 << ", " << index2 << " score" << m.score << endl;
         if(m.score < -100) {
           cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score << endl;
           auto e = boost::add_edge(index1, index2, m, mapper.pose_graph);
@@ -165,12 +173,13 @@ int main(int argc, char ** argv) {
       //cerr << "jiggling the loops" << endl;
       //mapper.jiggle();
 
-      mapper.write_g2o();
-      return 0;
+      //return 0;
 
     
       
     }
+    mapper.write_g2o();
+    return 0;
 
 
     if(0) {
