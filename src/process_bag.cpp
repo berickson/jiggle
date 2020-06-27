@@ -3,6 +3,8 @@
 #include <rosbag/view.h>
 #include <std_msgs/Int32.h>
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud_conversion.h>
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
@@ -10,6 +12,13 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <geometry_msgs/PoseArray.h>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl/PCLPointCloud2.h>
+//#include <pcl/conversions.h>
+#include <pcl_ros/transforms.h>
+
 
 #include <iomanip>
 
@@ -121,11 +130,48 @@ int main(int argc, char ** argv) {
         auto & untwisted_scan = mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size()-1].m_property.untwisted_scan;
         point_cloud.points.resize(untwisted_scan.size());
         for(uint32_t i = 0; i < untwisted_scan.size(); ++i) {
-          point_cloud.points[i].x = untwisted_scan[i].x;
+          point_cloud.points[i].x = untwisted_scan[i].x;  
           point_cloud.points[i].y = untwisted_scan[i].y;
           point_cloud.points[i].z = 0;
         }
         out_bag.write("/untwisted_scan",  time, point_cloud);
+
+        // write again as PointCloud2 as that is what many tools expect
+        sensor_msgs::PointCloud2 point_cloud2;
+        sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
+        out_bag.write("/untwisted_scan2", time, point_cloud2);
+      }
+
+        // also write original scan as PointCloud2 for tool support
+      {
+        ros::Time time(scan->header.stamp);
+        // sensor_msgs::PointCloud point_cloud;
+        pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
+
+        pcl_conversions::toPCL(scan->header, cloud_xyz.header);
+
+        vector<ScanLine<float>> lines;
+        ros_scan_to_scan_lines(*scan, lines);
+        vector<Point2d<float>> scan_xy;
+        get_scan_xy<float>(lines, scan_xy);
+        
+        cloud_xyz.points.resize(scan_xy.size());
+        for(uint32_t i = 0; i < scan_xy.size(); ++i) {
+          cloud_xyz.points[i].x = scan_xy[i].x;
+          cloud_xyz.points[i].y = scan_xy[i].y;
+          cloud_xyz.points[i].z  = 0;
+
+        }
+
+
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
+        sensor_msgs::PointCloud2 point_cloud2;
+        //sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
+        pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
+        out_bag.write("/scan2", time, point_cloud2);
+
+
       }
 
     }

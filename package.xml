@@ -51,6 +51,10 @@
   <depend>rosbag</depend>
   <depend>rosbag_storage</depend>
   <depend>eigen</depend>
+  <depend>libpcl-all-dev</depend>
+  <depend>pcl</depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
   
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
