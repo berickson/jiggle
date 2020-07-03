@@ -9,6 +9,7 @@
 #include <boost/graph/topological_sort.hpp>
 
 #include <fstream>
+#include <string>
 
 inline float distance(float dx, float dy) {
   return sqrt(dx*dx+dy*dy);
@@ -92,10 +93,6 @@ public:
       scan_xy = get_scan_xy(lines);
 
       auto v = boost::add_vertex(pose_graph);
-      Node & node = pose_graph[v];
-      node.header = scan->header;
-      node.pose = pose;
-      pose_graph[v] = node;
 
       if(n_scan>0) {
           //auto & twist = odom.twist.twist;
@@ -125,6 +122,11 @@ public:
           // nodes.emplace_back(node);
           //pose_graph[pose_graph.m_vertices.size()] = node;
       }
+      Node & node = pose_graph[v];
+      node.header = scan->header;
+      node.pose = pose;
+      pose_graph[v] = node;
+
       last_scan_xy = scan_xy;
       node.untwisted_scan = scan_xy;
     }
@@ -132,9 +134,9 @@ public:
     ++n_scan;
   }
 
-  void write_g2o() {
+  void write_g2o(std::string output_path) {
     
-    std::ofstream f ("/home/brian/g2o/bin/path.g2o");
+    std::ofstream f (output_path);
     auto & g = pose_graph;
     for(int i = 1; i < num_vertices(g); ++i) {
       for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {

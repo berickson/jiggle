@@ -97,8 +97,7 @@ public:
     }
 
     void move(Point2d<T> p, T dtheta) {
-        Point2d<T> w;
-        Pose2World(p, w);
+        Point2d<T> w = Pose2World(p);
         x = w.x;
         y = w.y;
         theta += dtheta;
@@ -127,9 +126,11 @@ public:
 
     }
 
-    inline void  Pose2World(const Point2d<T> & p, Point2d<T> & rv) const {
+    inline Point2d<T>  Pose2World(const Point2d<T> & p) const {
+        Point2d<T> rv;
         rv.x = p.x * cos_theta - p.y * sin_theta + x;
         rv.y = p.x * sin_theta + p.y * cos_theta + y;
+        return rv;
     }
 
 
@@ -327,39 +328,17 @@ vector<Point2d<T>> untwist_scan(
     untwist_timer.start();
     int count = twisted_readings.size();
     Pose<T> pose = initial_pose;
-    //vector<LineSegment<T>> world;
-    //world.reserve(count);
     vector<Point2d<T>> untwisted;
-    Point2d<T> p1 = {NAN, NAN};
-    Point2d<T> p2 = {NAN, NAN};
     for(size_t i = 0; i < twisted_readings.size()+1; ++i) {
-        //T scan_theta = twisted_readings[i%count].theta;//(T) i / count * 2. * EIGEN_PI;
-        // T d1 = twisted_readings[i%count].d;
-        //T x = twisted_readings[i%count].x;
-        //T y = twisted_readings[i%count].y;
-        p1=p2;
-        p2 = twisted_readings[i%count];
-        if(!isnan(p2.x)) {
-            pose.Pose2World(twisted_readings[i%count], p2);
+        auto p1 = twisted_readings[i%count];
+        if(!isnan(p1.x)) {
+            auto p2 = pose.Pose2World(p1);
             untwisted.emplace_back(p2);
         }
-        // if(! isnan(p1.x) && !isnan(p2.x)) {
-        //   world.emplace_back(p1, p2);
-        // }
         pose.move({twist_x/count, twist_y/count}, twist_theta/count);
     }
+    untwist_timer.stop();
 
-
-    // vector<ScanLine<T>> output;
-    // output.reserve(count);
-
-    // Pose<T> pose2(0,0,0);
-    // for(int i = 0; i < count; ++i) {
-    //     T scan_theta = twisted_readings[i].theta;//(T) i / count * 2 * EIGEN_PI;
-    //     output.emplace_back(scan_theta, fake_laser_reading<T>(pose2, scan_theta, world));
-    // }
-    // untwist_timer.stop();
-    // return output;
     return untwisted;
 }
 
@@ -453,7 +432,7 @@ void move_scan(
         if(!isnan(xy.x)) {
             p.x = xy.x;
             p.y = xy.y;
-            pose.Pose2World(p, p_new);
+            p_new = pose.Pose2World(p);
         } else {
             p_new.x = NAN;
             p_new.y = NAN;
