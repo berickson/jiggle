@@ -9,6 +9,8 @@
 #include <chrono>
 #include <random>
 
+#include <angles/angles.h>
+
 #define degrees2radians(theta) ((theta) * EIGEN_PI / 180.)
 #define radians2degrees(theta) ((theta) * 180. / EIGEN_PI)
 
@@ -171,7 +173,7 @@ std::string to_string(Pose<T> & pose) {
     stringstream ss;
     ss << std::fixed << std::setprecision(3) << pose.get_x() 
        << ", " << pose.get_y() 
-       << ", " << std::setprecision(1) << radians2degrees(pose.get_theta()) << "°";
+       << ", " << std::setprecision(1) << radians2degrees(angles::normalize_angle(pose.get_theta())) << "°";
     return ss.str();
 }
 

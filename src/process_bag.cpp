@@ -19,6 +19,9 @@
 //#include <pcl/conversions.h>
 #include <pcl_ros/transforms.h>
 
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
+
 
 #include <iomanip>
 
@@ -26,10 +29,6 @@
 
 using namespace std;
 
-
-int min_max_rand(int min, int max) {
-  return min + rand() % (max-min) ;
-}
 
 int main(int argc, char ** argv) {
 
@@ -94,12 +93,14 @@ int main(int argc, char ** argv) {
       ++n_scan;
       if(n_scan > scan_count_limit) break;
       mapper.add_scan(scan);
-      
+      if(n_scan%2 == 0) {
+        mapper.do_loop_closure();
+      }
+      ros::Time time(scan->header.stamp);
 
       // publish pose_array 
       {
         pose_array.header = scan->header;
-        ros::Time time(scan->header.stamp);
 
         // populate the pose graph
         auto & v = mapper.pose_graph.m_vertices;
@@ -119,6 +120,79 @@ int main(int argc, char ** argv) {
         }
 
         out_bag.write("/calculated_path",  time, pose_array);
+      }
+
+      // publish tf (map to neato_laser)
+      {
+        Pose<float> & pose = mapper.pose;
+        geometry_msgs::TransformStamped ts;
+        ts.header.frame_id = "map";
+        ts.header.stamp = scan->header.stamp;
+        ts.header.seq = scan->header.seq;
+        ts.child_frame_id = "neato_laser";
+        ts.transform.translation.x = pose.get_x();
+        ts.transform.translation.y = pose.get_y();
+        ts.transform.translation.z = 0;
+        tf2::Quaternion q;
+        q.setRPY(0,0,pose.get_theta());
+        ts.transform.rotation.x = q.x();
+        ts.transform.rotation.y = q.y();
+        ts.transform.rotation.z = q.z();
+        ts.transform.rotation.w = q.w();
+
+        tf::tfMessage  tf_msg;
+
+        //tf2_msgs::TFMessage tf_msg;
+
+        //tf::tfMessage tf_msg;
+        tf_msg.transforms.clear();
+        tf_msg.transforms.push_back(ts);
+
+        out_bag.write("/tf", time, tf_msg);
+
+      }
+
+      // publish path as markers
+      {
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "/map";
+        marker.header.stamp = scan->header.stamp;
+        marker.type = visualization_msgs::Marker::LINE_STRIP;
+
+        marker.ns = "robot_path";
+        marker.id = 0;
+        marker.type = visualization_msgs::Marker::LINE_STRIP;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 0.0;
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+        marker.scale.x = 0.025;
+        marker.color.r = 0.7;
+        marker.color.g = 0.0;
+        marker.color.b = 1.0;
+        marker.color.a = 1.0;
+        marker.frame_locked = true;
+
+        /// grab poses from pose graph vertices
+        auto & v = mapper.pose_graph.m_vertices;
+        marker.points.reserve(v.size());
+        for (int i = 0; i < v.size(); ++i) {
+          auto & pose = v[i].m_property.pose;
+          geometry_msgs::Point p;
+          p.x = pose.get_x();
+          p.y = pose.get_y();
+          p.z = 0;
+          marker.points.push_back(p);
+          ros::Time time(scan->header.stamp);
+          out_bag.write("/path_marker",  time, marker);
+        }
+
+        //g_marker_pub.publish(marker);        
+
       }
 
       // publish untwisted as a point cloud
@@ -187,73 +261,5 @@ int main(int argc, char ** argv) {
     bag.close();
 
     // find closures
-    if(1)
-    {
-      cerr << "calculating closures" << endl;
-      vector<pair<size_t,size_t>> closures;
-      
-      for(int i = 0; i < 500; ++i) {
-        size_t index1 = rand() % mapper.pose_graph.m_vertices.size();
-        size_t index2 = rand() % mapper.pose_graph.m_vertices.size();
-
-        if(labs(index1 - index2) < 30) continue;
-
-
-        auto node1 = mapper.pose_graph.m_vertices[index1].m_property;
-        auto node2 = mapper.pose_graph.m_vertices[index2].m_property;
-        // auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
-        const Pose<float> null_pose;
-        auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, null_pose);
-        // cerr << index1 << ", " << index2 << " score" << m.score << endl;
-        if(m.score < -150 && m.delta.get_polar().r > 0.1 ) {
-          cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score << " length " << m.delta.get_polar().r << endl;
-          auto e = boost::add_edge(index1, index2, m, mapper.pose_graph);
-        }
-      }
-
-   
-      
-    }
-    mapper.write_g2o("/home/brian/g2o/bin/path.g2o");
-    system("/home/brian/g2o/bin/g2o -o /home/brian/g2o/bin/path_out.g2o /home/brian/g2o/bin/path.g2o");
-    
-    return 0;
-
-
-    if(0) {
-      mapper.write_path_csv(cout);
-      return 0;
-    }
-
-
-    /*
-    Test 1: Pick a 5 equally spaced scans to test with, 
-    for each one, compare with all other scans, 
-    note the match scores, and figure out if there
-    is an accuracy pattern, use this to determine a
-    good cut-off score for matches.    
-    */
-
-
-   cout << "percent,score,index1,index2,seq1,seq2,d,dx,dy,dtheta" << endl;
-   for(float percent: {0.0, 0.2, 0.4, 0.6, 0.8}) {
-     size_t index1 = mapper.pose_graph.m_vertices.size() * percent;
-     auto node1 = mapper.pose_graph.m_vertices[index1].m_property;
-     
-     //auto node1=mapper.pose_graph[node1_id];
-     for(size_t index2 = 0; index2 < mapper.pose_graph.m_vertices.size(); ++index2) {
-       auto node2 = mapper.pose_graph.m_vertices[index2].m_property;
-       auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, node1.pose.relative_pose_to(node2.pose));
-       auto & delta = m.delta;
-       float dx = delta.get_x();
-       float dy = delta.get_y();
-       float d = sqrt(dx*dx+dy*dy);
-       cout << percent << "," << m.score << "," << index1 << "," << index2 << "," << node1.header.seq << "," << node2.header.seq << "," <<  d << "," <<  dx << "," << dy << ", " << delta.get_theta() << endl;
-     }
-   }
-    
-
-
-    return 0;
-
+    mapper.do_loop_closure();
 }

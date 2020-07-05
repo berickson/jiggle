@@ -15,6 +15,10 @@ inline float distance(float dx, float dy) {
   return sqrt(dx*dx+dy*dy);
 }
 
+int min_max_rand(int min, int max) {
+  return min + rand() % (max+1-min) ;
+}
+
 // converts ros message to format compatible with dewarp
 inline void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine<float>> & lines) {
   float angle = scan.angle_min;
@@ -152,6 +156,75 @@ public:
       }
     }
     f << "FIX 0" << endl;
+  }
+
+  void read_g2o(std::string input_path) {
+    std::ifstream f (input_path);
+    while(!f.eof()) {
+      std::string l;
+      std::getline(f, l);
+      if(l.size() > 0) {
+        std::stringstream ss(l);
+        std::string token;
+        std::getline(ss, token, ' ');
+        if(token == "VERTEX_SE2") {
+          int n;
+          float x,y,theta;
+          ss >> n >> x >> y >> theta;
+          // cerr << token << " " << n << " " << x << " " << y << " " << theta << endl;
+          Node & node = pose_graph[n];
+          node.pose = Pose<float>(x,y,theta);
+        }
+      }
+      pose = pose_graph[pose_graph.m_vertices.size()-1].pose;
+    }
+  }
+
+  void do_loop_closure() {
+    bool trace = false;
+    // don't re-check nodes
+    static uint32_t last_index_checked = 0;
+
+    if(last_index_checked >= pose_graph.m_vertices.size()) return;
+
+    if (trace) cerr << "calculating closures" << endl;
+    vector<pair<size_t,size_t>> closures;
+    
+    uint32_t closure_count = 0;
+    for(int i = 0; i < 300; ++i) {
+      size_t index1 = min_max_rand(last_index_checked+1,  pose_graph.m_vertices.size()-1);
+      size_t index2 = min_max_rand(0, last_index_checked);
+      if (trace) cerr << "indexes: " << index1 << ", " << index2 << endl;
+
+      if(labs(index1 - index2) < 30) continue;
+
+
+      auto node1 = pose_graph.m_vertices[index1].m_property;
+      auto node2 = pose_graph.m_vertices[index2].m_property;
+      auto starting_diff = node1.pose.relative_pose_to(node2.pose);
+      double d = starting_diff.get_polar().r;
+      if(d>2) continue;
+      const Pose<float> null_pose;
+      auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, null_pose);
+      //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
+      double d_new = m.delta.get_polar().r;
+      // cerr << index1 << ", " << index2 << " score" << m.score << endl;
+      if(m.score < -190 && d_new > 0.05 && d_new < 1) {
+        if(trace) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
+        << " pose " << to_string(starting_diff) << " pose_new " << to_string(m.delta) << endl;
+        auto e = boost::add_edge(index1, index2, m, pose_graph);
+        ++closure_count;
+      }
+    }
+
+    last_index_checked = pose_graph.m_vertices.size()-1;
+
+    if(closure_count > 0) {
+      this->write_g2o("/home/brian/g2o/bin/path.g2o");
+      system("/home/brian/g2o/bin/g2o -o /home/brian/g2o/bin/path_out.g2o /home/brian/g2o/bin/path.g2o");
+      this->read_g2o("/home/brian/g2o/bin/path_out.g2o");
+      if(trace) cerr << "done closing" << endl;
+    }
   }
 
   void jiggle() {
