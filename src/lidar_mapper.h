@@ -214,6 +214,7 @@ public:
         << " pose " << to_string(starting_diff) << " pose_new " << to_string(m.delta) << endl;
         auto e = boost::add_edge(index1, index2, m, pose_graph);
         ++closure_count;
+        break;
       }
     }
 

@@ -155,7 +155,7 @@ int main(int argc, char ** argv) {
       // publish path as markers
       {
         visualization_msgs::Marker marker;
-        marker.header.frame_id = "/map";
+        marker.header.frame_id = "map";
         marker.header.stamp = scan->header.stamp;
         marker.type = visualization_msgs::Marker::LINE_STRIP;
 
@@ -216,7 +216,7 @@ int main(int argc, char ** argv) {
         out_bag.write("/untwisted_scan2", time, point_cloud2);
       }
 
-        // also write original scan as PointCloud2 for tool support
+      // also write original scan as PointCloud2 for tool support
       {
         ros::Time time(scan->header.stamp);
         // sensor_msgs::PointCloud point_cloud;
@@ -244,6 +244,30 @@ int main(int argc, char ** argv) {
         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
         pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
         out_bag.write("/scan2", time, point_cloud2);
+      }
+
+      // write a map by projecting all scans to their poses
+      {
+        pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
+        auto & v = mapper.pose_graph.m_vertices;
+        for (int i = 0; i < v.size(); ++i) {
+          auto & node = v[i].m_property;
+          auto & pose = node.pose;
+          auto & untwisted = node.untwisted_scan;
+//          auto transform = pose.Pose2WorldTransform();
+          for(auto & point : untwisted) {
+            auto new_point = pose.Pose2World(point);
+            cloud_xyz.push_back(pcl::PointXYZ(new_point.x, new_point.y, 0));
+            pcl_conversions::toPCL(scan->header, cloud_xyz.header);
+          }
+        }
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
+        sensor_msgs::PointCloud2 point_cloud2;
+        //sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
+        pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
+        point_cloud2.header.frame_id="/map";
+        out_bag.write("/map_cloud", time, point_cloud2);
 
 
       }

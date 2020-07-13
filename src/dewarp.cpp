@@ -140,7 +140,7 @@ public:
         Eigen::Transform<T,2,Eigen::Affine> t;
         t.setIdentity();
         t.rotate(theta);
-        t.translate(Vector2T(x,y));
+        t.translate( Vector2T(x,y));
         return t;
     }
 
