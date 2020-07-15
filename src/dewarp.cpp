@@ -331,14 +331,33 @@ vector<Point2d<T>> untwist_scan(
     int count = twisted_readings.size();
     Pose<T> pose = initial_pose;
     vector<Point2d<T>> untwisted;
-    for(size_t i = 0; i < twisted_readings.size()+1; ++i) {
-        auto p1 = twisted_readings[i%count];
-        if(!isnan(p1.x)) {
-            auto p2 = pose.Pose2World(p1);
-            untwisted.emplace_back(p2);
+
+    bool ccw = false;
+
+    if(ccw) {
+        // ccw
+        for(size_t i = 0; i < twisted_readings.size()+1; ++i) {
+            auto p1 = twisted_readings[i%count];
+            if(!isnan(p1.x)) {
+                auto p2 = pose.Pose2World(p1);
+                untwisted.emplace_back(p2);
+            }
+            pose.move({twist_x/count, twist_y/count}, twist_theta/count);
         }
-        pose.move({twist_x/count, twist_y/count}, twist_theta/count);
+    } else {
+        // cw
+        for(int i = twisted_readings.size(); i >= 0; --i) {
+            auto p1 = twisted_readings[i%count];
+            if(!isnan(p1.x)) {
+                auto p2 = pose.Pose2World(p1);
+                untwisted.emplace_back(p2);
+            }
+            pose.move({twist_x/count, twist_y/count}, twist_theta/count);
+        }
+        std::reverse(untwisted.begin(), untwisted.end());
     }
+
+
     untwist_timer.stop();
 
     return untwisted;

@@ -209,7 +209,8 @@ public:
       //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
       double d_new = m.delta.get_polar().r;
       // cerr << index1 << ", " << index2 << " score" << m.score << endl;
-      if(m.score < -190 && d_new > 0.05 && d_new < 1) {
+      if(m.score < -850 && d_new > 0.05 && d_new < 3) {
+        trace = true;
         if(trace) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
         << " pose " << to_string(starting_diff) << " pose_new " << to_string(m.delta) << endl;
         auto e = boost::add_edge(index1, index2, m, pose_graph);

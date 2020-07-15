@@ -41,7 +41,7 @@ int main(int argc, char ** argv) {
     bag.open(bag_path);  // BagMode is Read by default
 
     rosbag::Bag out_bag;
-    out_bag.open("out.bag", rosbag::bagmode::Write);
+    out_bag.open(bag_path + ".out.bag", rosbag::bagmode::Write);
 
 
     uint32_t n_msg = 0, n_scan = 0;
@@ -129,7 +129,7 @@ int main(int argc, char ** argv) {
         ts.header.frame_id = "map";
         ts.header.stamp = scan->header.stamp;
         ts.header.seq = scan->header.seq;
-        ts.child_frame_id = "neato_laser";
+        ts.child_frame_id = "laser";
         ts.transform.translation.x = pose.get_x();
         ts.transform.translation.y = pose.get_y();
         ts.transform.translation.z = 0;
@@ -247,6 +247,7 @@ int main(int argc, char ** argv) {
       }
 
       // write a map by projecting all scans to their poses
+      if(n_scan % 10 == 0)
       {
         pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
         auto & v = mapper.pose_graph.m_vertices;
@@ -282,8 +283,9 @@ int main(int argc, char ** argv) {
     cerr << "total difference count: " << g_scan_difference_count << endl;
     cerr << "total wrap count: " << g_wrap_count << endl;
 
+    cout << "closing bag" << endl;
     bag.close();
 
     // find closures
-    mapper.do_loop_closure();
+    //mapper.do_loop_closure();
 }
