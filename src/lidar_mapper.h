@@ -221,10 +221,12 @@ public:
 
     last_index_checked = pose_graph.m_vertices.size()-1;
 
+    std::string g2o_path = "/g2o/bin";
     if(closure_count > 0) {
-      this->write_g2o("/home/brian/g2o/bin/path.g2o");
-      system("/home/brian/g2o/bin/g2o -o /home/brian/g2o/bin/path_out.g2o /home/brian/g2o/bin/path.g2o");
-      this->read_g2o("/home/brian/g2o/bin/path_out.g2o");
+      this->write_g2o(g2o_path+"/path.g2o");
+      std::string cmd = g2o_path+"/g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
+      system(cmd.c_str());
+      this->read_g2o(g2o_path+"/path_out.g2o");
       if(trace) cerr << "done closing" << endl;
     }
   }
