@@ -14,14 +14,48 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   sensor_msgs
   tf
+  tf2
+  tf2_ros
   hector_mapping
   hector_trajectory_server
 )
 
- find_package(PCL 1.3 REQUIRED)
- include_directories(${PCL_INCLUDE_DIRS})
- link_directories(${PCL_LIBRARY_DIRS})
- add_definitions(${PCL_DEFINITIONS})
+find_package(PCL 1.3 REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
+catkin_package()
+
+find_package(Eigen3 REQUIRED)
+
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
+)
+
+add_executable(jiggle src/jiggle.cpp)
+
+add_executable(process_bag src/process_bag.cpp)
+target_link_libraries(process_bag
+  ${catkin_LIBRARIES}
+)
+
+add_executable(get_slam_results src/get_slam_results.cpp)
+target_link_libraries(get_slam_results
+  ${catkin_LIBRARIES}
+)
+
+
+add_executable(
+  lidar_odom
+  src/lidar_odom.cpp)
+target_link_libraries(
+  lidar_odom
+  ${catkin_LIBRARIES}
+)
+
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -112,12 +146,12 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
+# catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES jiggle
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
-)
+# )
 
 
 
@@ -127,14 +161,14 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-find_package(Eigen3 REQUIRED)
+# find_package(Eigen3 REQUIRED)
 # include_directories()
 
-include_directories(
+# include_directories(
 # include
-  ${catkin_INCLUDE_DIRS}
-  ${Eigen_INCLUDE_DIRS}
-)
+#   ${catkin_INCLUDE_DIRS}
+#   ${Eigen_INCLUDE_DIRS}
+# )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
@@ -150,11 +184,11 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/jiggle_node.cpp)
-add_executable(jiggle src/jiggle.cpp)
+# add_executable(jiggle src/jiggle.cpp)
 
-add_executable(process_bag src/process_bag.cpp)
+# add_executable(process_bag src/process_bag.cpp)
 
-add_executable(get_slam_results src/get_slam_results.cpp)
+# add_executable(get_slam_results src/get_slam_results.cpp)
 
 
 ## Rename C++ executable without prefix
@@ -168,13 +202,13 @@ add_executable(get_slam_results src/get_slam_results.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(process_bag
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(process_bag
+#   ${catkin_LIBRARIES}
+# )
 
-target_link_libraries(get_slam_results
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(get_slam_results
+#   ${catkin_LIBRARIES}
+# )
 
 
 #############
