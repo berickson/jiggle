@@ -21,6 +21,7 @@ int min_max_rand(int min, int max) {
 
 // converts ros message to format compatible with dewarp
 inline void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine<float>> & lines) {
+  // coordinate system is backwards in lidar since it spins clockwise
   float angle = scan.angle_min;
   lines.resize(scan.ranges.size());
   for(int i = 0; i < scan.ranges.size(); ++i) {
