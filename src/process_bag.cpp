@@ -1,4 +1,6 @@
 
+#if(0)
+
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <std_msgs/Int32.h>
@@ -289,3 +291,4 @@ int main(int argc, char ** argv) {
     // find closures
     //mapper.do_loop_closure();
 }
+#endif

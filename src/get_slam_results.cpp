@@ -1,3 +1,4 @@
+#if(0)
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
 #include <hector_nav_msgs/GetRobotTrajectory.h>
@@ -47,3 +48,4 @@ int main(int argc, char **argv) {
    
     return 0;
 }
+#endif
