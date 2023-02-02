@@ -30,7 +30,6 @@ public:
     geometry_msgs::msg::TransformStamped tf_msg;
     tf2::Transform transform;
 
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr untwisted_point_cloud_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr untwisted_point_cloud2_publisher_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_;
 
@@ -61,8 +60,7 @@ public:
         q.setRPY(0,0,0);
         transform.setRotation(q);
 
-        untwisted_point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud>("/untwisted_cloud", 1);
-        untwisted_point_cloud2_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/untwisted_cloud2", 1);
+        untwisted_point_cloud2_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/untwisted_cloud", 1);
 
         using std::placeholders::_1;
         scan_subscription_ =  this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -104,6 +102,7 @@ public:
             }
 
             // publish untwisted as a point cloud
+            if(untwisted_point_cloud2_publisher_->get_subscription_count() > 0)
             {
                 static sensor_msgs::msg::PointCloud point_cloud;
 
@@ -116,7 +115,6 @@ public:
                 point_cloud.points[i].y = untwisted[i].y;
                 point_cloud.points[i].z = 0;
                 }
-                // untwisted_point_cloud_publisher_.publish(point_cloud);
 
                 // write again as PointCloud2 as that is what many tools expect
                 static sensor_msgs::msg::PointCloud2 point_cloud2;
@@ -127,7 +125,6 @@ public:
             RCLCPP_DEBUG(this->get_logger(), "dx: %f dy: %f dtheta: %f: score: %f", match.delta.get_x(), match.delta.get_y(), match.delta.get_theta(), match.score);
 
             tf2::Quaternion q;
-            // todo: negative here is suspicious, probably need to introduce lidar frame
             q.setRPY(0, 0, match.delta.get_theta());
             tf2::Transform t;
             t.setRotation(q);
@@ -136,7 +133,6 @@ public:
             transform *= t;
 
             
-  //          auto stamped = tf2::Stamped<tf2::Transform>(transform, tf2::getTimestamp(scan->header.stamp), "map");
 
             {
                 auto r = transform.getRotation();
