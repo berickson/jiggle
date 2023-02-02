@@ -37,6 +37,25 @@ public:
     LidarOdometer() 
     : Node("lidar_odometer")
     {
+
+        {
+            auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+            param_desc.description = "True if the input scan will be warped due to movement and should be dewarped";
+            this->declare_parameter("dewarp", true, param_desc);
+        }
+
+        {
+            auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+            param_desc.description = "The number of times to dewarp and refine matching, only used if dewarp is True";
+            param_desc.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+            
+            rcl_interfaces::msg::IntegerRange range;
+            range.set__from_value(1).set__to_value(10).set__step(1);
+            param_desc.integer_range= {range};
+
+            this->declare_parameter("dewarp_iterations", 2, param_desc);
+        }
+
         transform.setOrigin({0.0,0.0,0.0});
         tf2::Quaternion q;
         q.setRPY(0,0,0);
@@ -62,18 +81,25 @@ public:
             // match the scans with twist
             ScanMatch<float> match;
             {
+                bool dewarp = this->get_parameter("dewarp").get_parameter_value().get<bool>();
+                int32_t dewarp_iterations = dewarp ? this->get_parameter("dewarp_iterations").get_parameter_value().get<int32_t>() : 1;
                 Pose<float> diff; // start with zero diff, todo: use velicity / odom to estimate
                 const int scans_per_match = 1;
 
                 match = match_scans(last_scan_xy, untwisted, diff);
                 diff = match.delta;
-                for(uint32_t i = 0; i < 0; ++i) {
+                for(uint32_t i = 1; i <= dewarp_iterations; ++i) {
                     match = match_scans(last_scan_xy, untwisted, diff);
-                    untwisted = untwist_scan<float>(
-                        scan_xy, 
-                        diff.get_x()/scans_per_match, 
-                        diff.get_y()/scans_per_match, 
-                        diff.get_theta()/scans_per_match);
+                    diff = match.delta;
+                    if(dewarp) {
+                        untwisted = untwist_scan<float>(
+                            scan_xy, 
+                            diff.get_x()/scans_per_match, 
+                            diff.get_y()/scans_per_match, 
+                            diff.get_theta()/scans_per_match);
+                    } else {
+                        break;
+                    }
                 }
             }
 
