@@ -1,8 +1,8 @@
 #include "dewarp.cpp"
 #include <vector>
 
-#include <std_msgs/Header.h>
-#include <sensor_msgs/LaserScan.h>
+#include <std_msgs//msg/header.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -20,7 +20,7 @@ int min_max_rand(int min, int max) {
 }
 
 // converts ros message to format compatible with dewarp
-inline void ros_scan_to_scan_lines(const sensor_msgs::LaserScan & scan, vector<ScanLine<float>> & lines) {
+inline void ros_scan_to_scan_lines(const sensor_msgs::msg::LaserScan & scan, vector<ScanLine<float>> & lines) {
   // coordinate system is backwards in lidar since it spins clockwise
   float angle = scan.angle_min;
   lines.resize(scan.ranges.size());
@@ -48,7 +48,7 @@ public:
   string bag_path;
 
   struct Node {
-    std_msgs::Header header;
+    std_msgs::msg::Header header;
     Pose<float> pose;
     vector<Point2d<float>> untwisted_scan;
   };
@@ -73,9 +73,9 @@ public:
         match = pose_graph[*range.first];
       }
       o 
-        << node.header.seq << ","
+        << 1 << "," // was node header sequence which was deprecated
         << node.header.stamp.sec << ","
-        << node.header.stamp.nsec << ","
+        << node.header.stamp.nanosec << ","
         << match.score  << "," 
         << distance(match.delta.get_x(), match.delta.get_y()) << ","
         << match.delta.get_x()  << "," 
@@ -89,7 +89,7 @@ public:
   }
 
 
-  void add_scan(sensor_msgs::LaserScan::ConstPtr scan) {
+  void add_scan(sensor_msgs::msg::LaserScan::ConstPtr scan) {
     uint32_t scans_per_match = 1;
 
 

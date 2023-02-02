@@ -1,48 +1,63 @@
 #include <rclcpp/rclcpp.hpp>
 
-#include <sensor_msgs/LaserScan.h>
-#include <laser_geometry/laser_geometry.h>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/point_cloud.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+
+#include <laser_geometry/laser_geometry.hpp> 
 
 #include <tf2_ros/transform_broadcaster.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <geometry_msgs/TransformStamped.h>
-#include "sensor_msgs/point_cloud_conversion.h"
+#include <tf2/transform_datatypes.h>
+#include <tf2/convert.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+
+
+#include "sensor_msgs/point_cloud_conversion.hpp"
 
 #include <tf2/LinearMath/Transform.h>
+#include <tf2_ros/buffer_interface.h>
+
+#include <vector>
 
 #include "lidar_mapper.h"
 
+using namespace std;
 
-class LidarOdometer {
+class LidarOdometer : public rclcpp::Node {
 public:
-    ros::NodeHandle node_;
-    int seq = 0;
     vector<Point2d<float>> scan_xy;
     vector<Point2d<float>> last_scan_xy;
-    geometry_msgs::TransformStamped tf_msg;
+    geometry_msgs::msg::TransformStamped tf_msg;
     tf2::Transform transform;
 
-    ros::Publisher untwisted_point_cloud_publisher_;
-    ros::Publisher untwisted_point_cloud2_publisher_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr untwisted_point_cloud_publisher_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr untwisted_point_cloud2_publisher_;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_;
 
-    LidarOdometer() {
+    LidarOdometer() 
+    : Node("lidar_odometer")
+    {
         transform.setOrigin({0.0,0.0,0.0});
         tf2::Quaternion q;
         q.setRPY(0,0,0);
         transform.setRotation(q);
 
-        untwisted_point_cloud_publisher_ = node_.advertise<sensor_msgs::PointCloud> ("/untwisted_cloud", 1, false);
-        untwisted_point_cloud2_publisher_ = node_.advertise<sensor_msgs::PointCloud2> ("/untwisted_cloud2", 1, false);
+        untwisted_point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud>("/untwisted_cloud", 1);
+        untwisted_point_cloud2_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/untwisted_cloud2", 1);
+
+        using std::placeholders::_1;
+        scan_subscription_ =  this->create_subscription<sensor_msgs::msg::LaserScan>(
+      "scan", 1, std::bind(&LidarOdometer::scan_callback, this, _1));
+
     }
 
 
-    void scan_callback(const sensor_msgs::LaserScan::ConstPtr& scan) {
+    void scan_callback(const sensor_msgs::msg::LaserScan::ConstPtr& scan) {
         vector<ScanLine<float>> lines;
         ros_scan_to_scan_lines(*scan, lines);
         scan_xy = get_scan_xy(lines);
         auto untwisted = scan_xy;
         if(last_scan_xy.size() > 0) {
-            ++seq;
 
             // match the scans with twist
             ScanMatch<float> match;
@@ -64,8 +79,9 @@ public:
 
             // publish untwisted as a point cloud
             {
-                static sensor_msgs::PointCloud point_cloud;
-                ros::Time time(scan->header.stamp);
+                static sensor_msgs::msg::PointCloud point_cloud;
+
+                rclcpp::Time time(scan->header.stamp);
                 point_cloud.channels.resize(0);
                 point_cloud.header = scan->header;
                 point_cloud.points.resize(untwisted.size());
@@ -77,12 +93,12 @@ public:
                 // untwisted_point_cloud_publisher_.publish(point_cloud);
 
                 // write again as PointCloud2 as that is what many tools expect
-                static sensor_msgs::PointCloud2 point_cloud2;
+                static sensor_msgs::msg::PointCloud2 point_cloud2;
                 sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
-                untwisted_point_cloud2_publisher_.publish(point_cloud2);
+                untwisted_point_cloud2_publisher_->publish(point_cloud2);
             }
             
-            ROS_DEBUG("dx: %f dy: %f dtheta: %f: score: %f", match.delta.get_x(), match.delta.get_y(), match.delta.get_theta(), match.score);
+            RCLCPP_DEBUG(this->get_logger(), "dx: %f dy: %f dtheta: %f: score: %f", match.delta.get_x(), match.delta.get_y(), match.delta.get_theta(), match.score);
 
             tf2::Quaternion q;
             // todo: negative here is suspicious, probably need to introduce lidar frame
@@ -93,34 +109,44 @@ public:
 
             transform *= t;
 
-            auto stamped = tf2::Stamped<tf2::Transform>(transform, scan->header.stamp, "map");
-            tf_msg = tf2::toMsg(stamped);
+            
+  //          auto stamped = tf2::Stamped<tf2::Transform>(transform, tf2::getTimestamp(scan->header.stamp), "map");
+
+            {
+                auto r = transform.getRotation();
+                tf_msg.transform.rotation.w = r.getW();
+                tf_msg.transform.rotation.x = r.getX();
+                tf_msg.transform.rotation.y = r.getY();
+                tf_msg.transform.rotation.z = r.getZ();
+
+                auto t = transform.getOrigin();
+                tf_msg.transform.translation.x = t.getX();
+                tf_msg.transform.translation.y = t.getY();
+                tf_msg.transform.translation.z = t.getZ();
+
+                tf_msg.header.stamp = scan->header.stamp;
+            }
+
+
+
+//            tf_msg = tf2_ros::toMsg<tf2::Stamped<tf2::Transform>, geometry_msgs::msg::TransformStamped>(stamped);
             tf_msg.header.frame_id = "lidar_odom";
-            tf_msg.header.seq = seq;
             tf_msg.child_frame_id = "lidar_odom_laser";
 
-            static tf2_ros::TransformBroadcaster br;
+            static tf2_ros::TransformBroadcaster br(this);
             br.sendTransform(tf_msg);
         }
         last_scan_xy = untwisted;
     }
 
-    void run() {
-        ROS_INFO("starting run");
-        ros::Subscriber sub = node_.subscribe("scan", 1, &LidarOdometer::scan_callback, this);
-
-        ros::spin();
-
-    }
 };
 
 #include <iostream>
 
 int main(int argc, char ** argv) {
-    ros::init(argc, argv, "lidar_odom");
-    ROS_INFO("starting LidarOdometer");
-    LidarOdometer lidar_odometer;
-    lidar_odometer.run();
-    std::cout << std::endl <<  "exiting lidar_odom" << std::endl;
+    rclcpp::init(argc, argv);
+
+    rclcpp::spin(std::make_shared<LidarOdometer>());
+    rclcpp::shutdown();
     return 0;
 }

@@ -9,7 +9,18 @@
 #include <chrono>
 #include <random>
 
-#include <angles/angles.h>
+//#include <angles/angles.h>
+namespace angles {
+    float normalize_angle(float radians) {
+        while(radians > M_2_PI) {
+            radians -= M_2_PI;
+        }
+        while(radians < 0) {
+            radians += M_2_PI;
+        }
+        return radians;
+    }
+}
 
 #define degrees2radians(theta) ((theta) * EIGEN_PI / 180.)
 #define radians2degrees(theta) ((theta) * 180. / EIGEN_PI)
