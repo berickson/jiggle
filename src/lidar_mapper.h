@@ -89,7 +89,7 @@ public:
   }
 
 
-  void add_scan(sensor_msgs::msg::LaserScan::ConstPtr scan) {
+  void add_scan(sensor_msgs::msg::LaserScan::ConstSharedPtr scan) {
     uint32_t scans_per_match = 1;
 
 

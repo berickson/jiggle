@@ -12,8 +12,6 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
 
-#include "sensor_msgs/point_cloud_conversion.hpp"
-
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_ros/buffer_interface.h>
 
@@ -69,7 +67,7 @@ public:
     }
 
 
-    void scan_callback(const sensor_msgs::msg::LaserScan::ConstPtr& scan) {
+    void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan) {
         vector<ScanLine<float>> lines;
         ros_scan_to_scan_lines(*scan, lines);
         scan_xy = get_scan_xy(lines);
@@ -104,22 +102,41 @@ public:
             // publish untwisted as a point cloud
             if(untwisted_point_cloud2_publisher_->get_subscription_count() > 0)
             {
-                static sensor_msgs::msg::PointCloud point_cloud;
-
-                rclcpp::Time time(scan->header.stamp);
-                point_cloud.channels.resize(0);
-                point_cloud.header = scan->header;
-                point_cloud.points.resize(untwisted.size());
-                for(uint32_t i = 0; i < untwisted.size(); ++i) {
-                point_cloud.points[i].x = untwisted[i].x;  
-                point_cloud.points[i].y = untwisted[i].y;
-                point_cloud.points[i].z = 0;
+                static sensor_msgs::msg::PointCloud2 p;
+                p.header = scan->header;
+                p.height = 1;
+                p.width = untwisted.size();
+                p.fields.resize(3);
+                p.fields[0].name = "x";
+                p.fields[1].name = "y";
+                p.fields[2].name = "z";
+                int offset = 0;
+                for (size_t d = 0; d < p.fields.size(); ++d, offset += sizeof(float)) {
+                    p.fields[d].offset = offset;
+                    p.fields[d].datatype = sensor_msgs::msg::PointField::FLOAT32;
+                    p.fields[d].count = 1;
+                }
+                p.point_step = offset;
+                p.row_step = p.point_step * p.width;
+                p.data.resize(p.width * p.point_step);
+                p.is_bigendian = false;
+                p.is_dense = false;
+                // Copy the data points
+                float z = 0.0;
+                for (size_t cp = 0; cp < p.width; ++cp) {
+                    memcpy(
+                        &p.data[cp * p.point_step + p.fields[0].offset],
+                        &untwisted[cp].x, sizeof(float));
+                    memcpy(
+                        &p.data[cp * p.point_step + p.fields[1].offset],
+                        &untwisted[cp].y, sizeof(float));
+                    memcpy(
+                        &p.data[cp * p.point_step + p.fields[2].offset],
+                        &z, sizeof(float));
                 }
 
-                // write again as PointCloud2 as that is what many tools expect
-                static sensor_msgs::msg::PointCloud2 point_cloud2;
-                sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
-                untwisted_point_cloud2_publisher_->publish(point_cloud2);
+
+                untwisted_point_cloud2_publisher_->publish(p);
             }
             
             RCLCPP_DEBUG(this->get_logger(), "dx: %f dy: %f dtheta: %f: score: %f", match.delta.get_x(), match.delta.get_y(), match.delta.get_theta(), match.score);
