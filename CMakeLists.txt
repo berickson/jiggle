@@ -18,9 +18,13 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(laser_geometry REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(rosbag2 REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
 
 # find_package(catkin REQUIRED COMPONENTS
 #   roscpp
@@ -48,10 +52,18 @@ include_directories(
   ${Eigen_INCLUDE_DIRS}
 )
 
-add_executable(jiggle src/jiggle.cpp)
-
-
 add_executable(lidar_odom src/lidar_odom.cpp)
+add_executable(process_bag src/process_bag.cpp)
+
+ament_target_dependencies(process_bag
+  tf2
+  tf2_ros
+  std_msgs
+  sensor_msgs
+  nav_msgs
+  geometry_msgs
+  rosbag2_cpp
+  visualization_msgs)
 
 ament_target_dependencies(lidar_odom
   rclcpp
@@ -65,6 +77,7 @@ ament_target_dependencies(lidar_odom
 
 install(TARGETS
   lidar_odom
+  process_bag
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

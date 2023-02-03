@@ -1,7 +1,7 @@
 #include "dewarp.cpp"
 #include <vector>
 
-#include <std_msgs//msg/header.hpp>
+#include <std_msgs/msg/header.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 
 #include <boost/graph/graph_traits.hpp>

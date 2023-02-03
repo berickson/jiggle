@@ -33,5 +33,11 @@ Warning: Jiggle SLAM is in early development. Use at your own risk
 
 
 
+<h2>Useful Notes</h2>
+Test with ros1 bags by converting them with rosbags-convert
 
+```
+pip install rosbags-convert
+rosbags-convert my.bag
+```
 
