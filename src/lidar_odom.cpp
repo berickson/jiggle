@@ -25,8 +25,8 @@ class LidarOdometer : public rclcpp::Node {
 public:
     vector<Point2d<float>> scan_xy;
     vector<Point2d<float>> last_scan_xy;
-    geometry_msgs::msg::TransformStamped tf_msg;
     tf2::Transform transform;
+    Pose<float> pose;
 
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr untwisted_point_cloud2_publisher_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_;
@@ -82,8 +82,6 @@ public:
                 Pose<float> diff; // start with zero diff, todo: use velicity / odom to estimate
                 const int scans_per_match = 1;
 
-                match = match_scans(last_scan_xy, untwisted, diff);
-                diff = match.delta;
                 for(uint32_t i = 1; i <= dewarp_iterations; ++i) {
                     match = match_scans(last_scan_xy, untwisted, diff);
                     diff = match.delta;
@@ -141,6 +139,8 @@ public:
             
             RCLCPP_DEBUG(this->get_logger(), "dx: %f dy: %f dtheta: %f: score: %f", match.delta.get_x(), match.delta.get_y(), match.delta.get_theta(), match.score);
 
+            pose.move({match.delta.get_x(), match.delta.get_y()}, match.delta.get_theta());
+
             tf2::Quaternion q;
             q.setRPY(0, 0, match.delta.get_theta());
             tf2::Transform t;
@@ -149,9 +149,19 @@ public:
 
             transform *= t;
 
-            
+            RCLCPP_INFO(this->get_logger(), "pose: {%f},{%f},{%f} transform: {%f},{%f},{%f}", 
+                pose.get_x(), 
+                pose.get_y(), 
+                pose.get_theta(), 
+                transform.getOrigin().getX(),
+                transform.getOrigin().getY(),
+                transform.getRotation().getAngle());
 
+            geometry_msgs::msg::TransformStamped tf_msg;
             {
+
+                tf_msg.header.frame_id = "lidar_odom";
+                tf_msg.child_frame_id = "lidar_odom_laser";
                 auto r = transform.getRotation();
                 tf_msg.transform.rotation.w = r.getW();
                 tf_msg.transform.rotation.x = r.getX();
@@ -168,12 +178,25 @@ public:
 
 
 
-//            tf_msg = tf2_ros::toMsg<tf2::Stamped<tf2::Transform>, geometry_msgs::msg::TransformStamped>(stamped);
-            tf_msg.header.frame_id = "lidar_odom";
-            tf_msg.child_frame_id = "lidar_odom_laser";
 
             static tf2_ros::TransformBroadcaster br(this);
             br.sendTransform(tf_msg);
+
+            // send empty transform from map to lidar_odom
+            {
+                geometry_msgs::msg::TransformStamped map_to_lidar_msg;
+                map_to_lidar_msg.header.stamp = tf_msg.header.stamp;
+                map_to_lidar_msg.header.frame_id = "map";
+                map_to_lidar_msg.child_frame_id = "lidar_odom";
+                map_to_lidar_msg.transform.rotation.w=1;
+                map_to_lidar_msg.transform.rotation.x=0;
+                map_to_lidar_msg.transform.rotation.y=0;
+                map_to_lidar_msg.transform.rotation.z=0;
+                map_to_lidar_msg.transform.translation.x=0;
+                map_to_lidar_msg.transform.translation.y=0;
+                map_to_lidar_msg.transform.translation.z=0;
+                br.sendTransform(map_to_lidar_msg);
+            }
         }
         last_scan_xy = untwisted;
     }

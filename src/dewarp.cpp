@@ -92,11 +92,13 @@ private:
 public:
     inline T get_x() const { return x; }
     inline T get_y()  const { return y; }
-    inline T get_theta()  const { return theta; }
+    inline T get_theta()  const { 
+        return theta; 
+    }
     inline Polar<T> get_polar() const {
         Polar<T> p;
         p.r = sqrt(x*x+y*y);
-        p.theta = atan2(y,x);
+        p.theta = angles::normalize_angle(atan2(y,x));
         return p;
     }
 
@@ -114,6 +116,7 @@ public:
         x = w.x;
         y = w.y;
         theta += dtheta;
+        theta = angles::normalize_angle(theta);
 
         update_trig();
     }
@@ -124,7 +127,7 @@ public:
         Pose & p1 = *this;
         T dx = p2.x - p1.x;
         T dy = p2.y - p1.y;
-        T theta=atan2(dy,dx);
+        T theta = angles::normalize_angle(atan2(dy,dx));
         T r = sqrt(dy*dy+dx*dx);
 
         // Pose rv in terms of p1
@@ -132,7 +135,7 @@ public:
         Pose rv;
         rv.x = cos(theta_rel)*r;
         rv.y = sin(theta_rel)*r;
-        rv.theta = p2.theta - p1.theta;
+        rv.theta = angles::normalize_angle(p2.theta - p1.theta);
         rv.update_trig();
         return rv;
         
@@ -403,7 +406,7 @@ inline T abs_sum(vector<T> & v) {
 
 // based loosely on https://martin-thoma.com/twiddle/
 template <class T>
-MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f, T threshold = 0.003) {
+MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f, T threshold = 0.0003) {
     
     // initialize parameters to guess
     vector<T> p = guess;
