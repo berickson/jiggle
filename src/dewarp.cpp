@@ -385,6 +385,7 @@ vector<LineSegment<T>> get_world() {
     world.emplace_back(-10, 3, 10, 3);
     world.emplace_back(-10, -3, 10, -3);
     world.emplace_back(10, 2, 10, -3);
+    world.emplace_back(-10, 3, -10, -3);
     return world;
 }
 
@@ -411,9 +412,10 @@ MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f
     // initialize parameters to guess
     vector<T> p = guess;
     T best_error = f(p);
+    float min_dp = 0.00003;
 
     // potential changes
-    auto dp = std::vector<T>(guess.size(), 0.001);
+    auto dp = std::vector<T>(guess.size(), 0.1);
     const T growth_rate = 1.3;
     const auto p_size = p.size();
 
@@ -448,6 +450,11 @@ MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f
                     // direction, the step size might simply be too big.
                     dp[i] /= growth_rate;
                 }
+            }
+
+            // avoid vanishing gradient / delta
+            if(dp[i] < min_dp) {
+                dp[i] = min_dp;
             }
         }
     }
