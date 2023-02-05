@@ -26,6 +26,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(rosbag2 REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 
+find_package(ament_lint_auto REQUIRED)
+
 # find_package(catkin REQUIRED COMPONENTS
 #   roscpp
 #   rospy
@@ -52,6 +54,7 @@ include_directories(
   ${Eigen_INCLUDE_DIRS}
 )
 
+
 add_executable(lidar_odom src/lidar_odom.cpp)
 add_executable(process_bag src/process_bag.cpp)
 
@@ -75,10 +78,16 @@ ament_target_dependencies(lidar_odom
   tf2_ros
 )
 
+find_package(ament_cmake_gtest REQUIRED)
+ament_add_gtest(dewarp_test src/dewarp_test.cpp )
+
 install(TARGETS
+  dewarp_test
   lidar_odom
   process_bag
   DESTINATION lib/${PROJECT_NAME})
+
+
 
 ament_package()
 

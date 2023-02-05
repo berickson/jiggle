@@ -89,12 +89,12 @@ public:
   }
 
 
-  void add_scan(sensor_msgs::msg::LaserScan::ConstSharedPtr scan) {
+  void add_scan(const sensor_msgs::msg::LaserScan& scan) {
     uint32_t scans_per_match = 1;
 
 
     if(n_scan % scans_per_match == 0) {
-      ros_scan_to_scan_lines(*scan, lines);
+      ros_scan_to_scan_lines(scan, lines);
       scan_xy = get_scan_xy(lines);
 
       auto v = boost::add_vertex(pose_graph);
@@ -128,7 +128,7 @@ public:
           //pose_graph[pose_graph.m_vertices.size()] = node;
       }
       Node & node = pose_graph[v];
-      node.header = scan->header;
+      node.header = scan.header;
       node.pose = pose;
       pose_graph[v] = node;
 

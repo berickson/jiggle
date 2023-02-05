@@ -12,11 +12,11 @@
 //#include <angles/angles.h>
 namespace angles {
     float normalize_angle(float radians) {
-        while(radians > M_2_PI) {
-            radians -= M_2_PI;
+        while(radians > M_PI) {
+            radians -= 2 * M_PI;
         }
-        while(radians < 0) {
-            radians += M_2_PI;
+        while(radians < -M_PI) {
+            radians += 2 * M_PI;
         }
         return radians;
     }
@@ -406,22 +406,28 @@ inline T abs_sum(vector<T> & v) {
 
 // based loosely on https://martin-thoma.com/twiddle/
 template <class T>
-MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f, T threshold = 0.0003) {
+MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f, T threshold = 0.0003, bool log_goal_steps = false) {
     
     // initialize parameters to guess
     vector<T> p = guess;
     T best_error = f(p);
 
     // potential changes
-    auto dp = std::vector<T>(guess.size(), 0.01);
-    const T growth_rate = 1.5;
+    auto dp = std::vector<T>(guess.size(), 0.001);
+    const T growth_rate = 1.3;
     const auto p_size = p.size();
 
 
     while(abs_sum(dp) > threshold) {
+        // if(log_goal_steps) {
+        //     cout << "looping p "<< p[0] << " " << p[1] << " " << p[2] << " dp:" << dp[0] << " " << dp[1] << " " << dp[2] << endl;
+        // }
         for(size_t i = 0; i< p_size; ++i) {
             p[i] += dp[i];
             T error = f(p);
+            // if(log_goal_steps) {
+            //     cout << "error: " << error << endl;
+            // }
 
             if (error < best_error) {
                 best_error = error;
@@ -638,20 +644,22 @@ struct ScanMatch {
 
 
 template <class T = double>
-ScanMatch<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>> & scan2_xy, Pose<T> guess) {
+ScanMatch<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point2d<T>> & scan2_xy, Pose<T> guess, bool log_goal_steps = false) {
     match_scans_timer.start();
     vector<Point2d<T>> scan2b;
     scan2b.reserve(scan2_xy.size());
-    auto error_function = [&scan1_xy, &scan2_xy, &scan2b](const vector<T> & params){
+    auto error_function = [&scan1_xy, &scan2_xy, &scan2b, &log_goal_steps](const vector<T> & params){
         Pose<T> pose(params[0], params[1], params[2]);
         move_scan(scan2_xy, pose, scan2b);
         T d = scan_difference(scan1_xy, scan2b);
-        //cout << "difference: " << d << " pose: " << to_string(pose) << endl;
+        if(log_goal_steps) {
+            cout << "difference: " << d << " pose: " << to_string(pose) << endl;
+        }
 
         return d;
     };
 
-    MinimizeResult<T> r = minimize<T>({guess.get_x(),guess.get_y(),guess.get_theta()}, error_function);
+    MinimizeResult<T> r = minimize<T>({guess.get_x(),guess.get_y(),guess.get_theta()}, error_function, 0.0001, log_goal_steps);
     Pose<T> match(r.p[0], r.p[1], r.p[2]);
     match_scans_timer.stop();
     return {match, r.error};
@@ -659,33 +667,14 @@ ScanMatch<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point
 
 
 template <class T = double>
-pair<Pose<T>,T> match_scans(const vector<ScanLine<T>> & scan1, const vector<ScanLine<T>> & scan2) {
+ScanMatch<T> match_scans(const vector<ScanLine<T>> & scan1, const vector<ScanLine<T>> & scan2, Pose<T>& guess, bool log_goal_steps) {
     match_scans_timer.start();
     auto scan1_xy = get_scan_xy(scan1);
     auto scan2_xy = get_scan_xy(scan2);
-    return match_scans(scan1_xy, scan2_xy);
+    Pose<T> null_pose;
+    return match_scans(scan1_xy, scan2_xy, guess, log_goal_steps);
 }
 
-
-template<class T = double>
-void test_match_scans() {
-    size_t n_points = 360;
-    auto world = get_world<T>();
-
-    std::normal_distribution<T> x_value(0.0,0.5);
-    std::normal_distribution<T> y_value(0.0,0.5);
-    std::normal_distribution<T> theta_value(0.0,degrees2radians(3));
-
-    Pose<T> pose1;
-    Pose<T> pose2(x_value(random_engine), y_value(random_engine), (theta_value(random_engine)));
-    auto scan1 = scan_with_twist<T>(world, n_points, 0, 0, 0, pose1);
-    auto scan2 = scan_with_twist<T>(world, n_points, 0, 0, 0, pose2);
-
-    auto matched_pose = match_scans(scan1, scan2);
-
-    cout << "actual pose: " << to_string(pose2)
-         << " -> matched pose: " << to_string(matched_pose) << endl;
-}
 
 void test_prorate() {
     double y = prorate(15,10,20,10,40);
@@ -718,12 +707,7 @@ void test_move_scan(bool trace = false) {
     }
 }
 
-template <class T>
-void test_match_n_scans(size_t n) {
-    cout << "matching  " << n << " random scans" << endl;
-    for(size_t i = 0; i < n; ++i) test_match_scans<T>();
-    cout << "done matching  " << n << " random scans" << endl;
-}
+
 
 void test_fake_scan() {
     vector<ScanLine<double>> scan;

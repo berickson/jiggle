@@ -1,149 +1,132 @@
-#include <rosbag2_cpp/writer.hpp>
-#include <rosbag2_cpp/reader.hpp>
-#include <rosbag2_storage/storage_filter.hpp>
 #include <rosbag2_cpp/converter_interfaces/serialization_format_converter.hpp>
 #include <rosbag2_cpp/converter_interfaces/serialization_format_deserializer.hpp>
+#include <rosbag2_cpp/reader.hpp>
+#include <rosbag2_cpp/writer.hpp>
+#include <rosbag2_storage/storage_filter.hpp>
 
 #include "rosbag2_cpp/typesupport_helpers.hpp"
 
-//#include <rosbag/  view.h>
-#include <std_msgs/msg/int32.hpp>
+// #include <rosbag/  view.h>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud_conversion.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-//#include <nav_msgs/msg/occupancy_grid.hpp>
+#include <std_msgs/msg/int32.hpp>
+// #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-//#include <tf/tfMessage.h>
+// #include <tf/tfMessage.h>
 #include <tf2/LinearMath/Transform.h>
-//#include <tf2/LinearMath/Quaternion.h>
-//#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+// #include <tf2/LinearMath/Quaternion.h>
+// #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <geometry_msgs/msg/pose_array.hpp>
 
-//#include <tf2/tf2/convert.h>
-//#include <pcl_conversions/pcl_conversions.h>
-//#include <pcl/point_types.h>
-//#include <pcl/PCLPointCloud2.h>
-//#include <pcl/conversions.h>
-// #include <pcl_ros/transforms.hpp>
-
-#include <visualization_msgs/msg/marker.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
-
+// #include <tf2/tf2/convert.h>
+// #include <pcl_conversions/pcl_conversions.h>
+// #include <pcl/point_types.h>
+// #include <pcl/PCLPointCloud2.h>
+// #include <pcl/conversions.h>
+//  #include <pcl_ros/transforms.hpp>
 
 #include <iomanip>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "lidar_mapper.h"
 
 using namespace std;
 
+int main(int argc, char** argv) {
+  LidarMapper mapper;
+  rosbag2_cpp::Reader bag;
+  string bag_path =
+      (argc >= 2)
+          ? argv[1]
+          : "/home/brian/jiggle_ws/data/a3-lab-bar-kitchen-2020-07-14-21-38-09";
+  mapper.bag_path = bag_path;  // for logging
+  uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2], NULL, 10)
+                                          : numeric_limits<uint32_t>::max();
 
-int main(int argc, char ** argv) {
+  bag.open(bag_path);  // BagMode is Read by default
 
-    LidarMapper mapper;
-    rosbag2_cpp::Reader bag;
-    string bag_path = (argc >= 2) ? argv[1]: "/home/brian/jiggle_ws/data/a3-lab-bar-kitchen-2020-07-14-21-38-09";
-    mapper.bag_path = bag_path; // for logging
-    uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2],NULL,10): numeric_limits<uint32_t>::max();
+  // rosbag2_cpp::Writer out_bag;
+  // out_bag.open(bag_path + ".out.bag");
 
-    bag.open(bag_path);  // BagMode is Read by default
+  uint32_t n_msg = 0, n_scan = 0;
 
-    //rosbag2_cpp::Writer out_bag;
-    //out_bag.open(bag_path + ".out.bag");
+  rosbag2_storage::StorageFilter filter;
+  filter.topics.push_back(std::string("/scan"));
+  filter.topics.push_back(std::string("/poseupdate"));
+  filter.topics.push_back(std::string("/tf"));
 
+  bag.set_filter(filter);
 
-    uint32_t n_msg = 0, n_scan = 0;
+  Pose<float> pose;
+  Pose<float> matched_pose(0, 0, 0);
 
-    rosbag2_storage::StorageFilter filter;
-    filter.topics.push_back(std::string("/scan"));
-    filter.topics.push_back(std::string("/poseupdate"));
-    filter.topics.push_back(std::string("/tf"));
+  nav_msgs::msg::Odometry odom;
+  bool have_odom = false;
 
-    bag.set_filter(filter);
+  // geometry_msgs::msg::Transform base_link;
 
+  geometry_msgs::msg::PoseArray pose_array;
 
-    Pose<float> pose;
-    Pose<float> matched_pose(0,0,0);
-    
-    nav_msgs::msg::Odometry odom;
-    bool have_odom = false;
+  auto ros_message =
+      std::make_shared<rosbag2_cpp::rosbag2_introspection_message_t>();
+  ros_message->time_stamp = 0;
+  ros_message->message = nullptr;
+  ros_message->allocator = rcutils_get_default_allocator();
 
-    //geometry_msgs::msg::Transform base_link;
+  rosbag2_cpp::SerializationFormatConverterFactory factory;
+  std::unique_ptr<
+      rosbag2_cpp::converter_interfaces::SerializationFormatDeserializer>
+      cdr_deserializer_;
 
-    geometry_msgs::msg::PoseArray pose_array;
+  auto library = rosbag2_cpp::get_typesupport_library(
+      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
+  auto type_support = rosbag2_cpp::get_typesupport_handle(
+      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
+  cdr_deserializer_ = factory.load_deserializer("cdr");
 
+  while (bag.has_next()) {
+    auto m = bag.read_next();
 
-    
-    while(bag.has_next()) {
-      auto m = bag.read_next();
+    ++n_msg;
 
-      ++n_msg;
+    m.get();
 
-      m.get();
+    rclcpp::SerializedMessage extracted_serialized_msg(*m->serialized_data);
 
-      rclcpp::SerializedMessage extracted_serialized_msg(*m->serialized_data);
-      cout << m->topic_name << endl;
-
-       auto topic = m->topic_name;
-       if (topic == "/scan")
-       {
-        sensor_msgs::msg::LaserScan msg;
-        
-        auto ros_message = std::make_shared< rosbag2_cpp::rosbag2_introspection_message_t>();
-        ros_message->time_stamp = 0;
-        ros_message->message = nullptr;
-        ros_message->allocator = rcutils_get_default_allocator();
-        ros_message->message = &msg;
-        
-        rosbag2_cpp::SerializationFormatConverterFactory factory;
-        std::unique_ptr<rosbag2_cpp::converter_interfaces::SerializationFormatDeserializer> cdr_deserializer_;
-        
-
-        auto library = rosbag2_cpp::get_typesupport_library("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
-        auto type_support = rosbag2_cpp::get_typesupport_handle("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
-
-
-        for(auto s : factory.get_declared_serialization_plugins()) {
-          cout << "Plugin: " << s << endl;
-        }
-        cdr_deserializer_ = factory.load_deserializer("cdr");
-
-        cdr_deserializer_->deserialize(m, type_support, ros_message);
-        cout << msg.scan_time;
-//        cdr_deserializer_->deserialize(m,  msg);
-       }
+    auto topic = m->topic_name;
+    sensor_msgs::msg::LaserScan scan_msg;
+    if (topic != "/scan") {
+      cout << "skipping message from " << topic << endl;
+      continue;
     }
+
+    ros_message->message = &scan_msg;
+
+    cdr_deserializer_->deserialize(m, type_support, ros_message);
+
+    cout << topic << "frame_id: " << scan_msg.header.frame_id
+          << " sec: " << scan_msg.header.stamp.sec
+          << " nanosec: " << scan_msg.header.stamp.nanosec
+          << " scan_time: " << scan_msg.scan_time
+          << " reading count:" << scan_msg.ranges.size() << endl;
+
+      ++n_scan;
+      if(n_scan > scan_count_limit) break;
+      mapper.add_scan(scan_msg);
+      if(n_scan%2 == 0) {
+        mapper.do_loop_closure();
+      }
+  }
+  mapper.write_path_csv(std::cout);
 }
-//       if(m.isType<tf::tfMessage>()) {
-//         tf::tfMessage::ConstPtr new_tf = m.instantiate<tf::tfMessage>();
-//         if(new_tf->transforms[0].child_frame_id == "/base_footprint") {
-//           base_link = new_tf->transforms[0].transform;
-//         }
-//         continue;
-//       }
 
-      
-//       if(m.isType<nav_msgs::Odometry>())
-//       {
-//         nav_msgs::Odometry::ConstPtr new_odom = m.instantiate<nav_msgs::Odometry>();
-//         odom = *new_odom;
-//         have_odom = true;
-//         continue;
-//       }
-//       sensor_msgs::LaserScan::ConstPtr scan = m.instantiate<sensor_msgs::LaserScan>();
+//      ros::Time time(scan->header.stamp);
 
-
-//       if(scan==NULL) continue;
-//       ++n_scan;
-//       if(n_scan > scan_count_limit) break;
-//       mapper.add_scan(scan);
-//       if(n_scan%2 == 0) {
-//         mapper.do_loop_closure();
-//       }
-//       ros::Time time(scan->header.stamp);
-
-//       // publish pose_array 
+//       // publish pose_array
 //       {
 //         pose_array.header = scan->header;
 
@@ -236,7 +219,7 @@ int main(int argc, char ** argv) {
 //           out_bag.write("/path_marker",  time, marker);
 //         }
 
-//         //g_marker_pub.publish(marker);        
+//         //g_marker_pub.publish(marker);
 
 //       }
 
@@ -246,10 +229,11 @@ int main(int argc, char ** argv) {
 //         ros::Time time(scan->header.stamp);
 //         point_cloud.channels.resize(0);
 //         point_cloud.header = scan->header;
-//         auto & untwisted_scan = mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size()-1].m_property.untwisted_scan;
+//         auto & untwisted_scan =
+//         mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size()-1].m_property.untwisted_scan;
 //         point_cloud.points.resize(untwisted_scan.size());
 //         for(uint32_t i = 0; i < untwisted_scan.size(); ++i) {
-//           point_cloud.points[i].x = untwisted_scan[i].x;  
+//           point_cloud.points[i].x = untwisted_scan[i].x;
 //           point_cloud.points[i].y = untwisted_scan[i].y;
 //           point_cloud.points[i].z = 0;
 //         }
@@ -257,8 +241,8 @@ int main(int argc, char ** argv) {
 
 //         // write again as PointCloud2 as that is what many tools expect
 //         sensor_msgs::PointCloud2 point_cloud2;
-//         sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
-//         out_bag.write("/untwisted_scan2", time, point_cloud2);
+//         sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
+//         point_cloud2); out_bag.write("/untwisted_scan2", time, point_cloud2);
 //       }
 
 //       // also write original scan as PointCloud2 for tool support
@@ -273,7 +257,7 @@ int main(int argc, char ** argv) {
 //         ros_scan_to_scan_lines(*scan, lines);
 //         vector<Point2d<float>> scan_xy;
 //         get_scan_xy<float>(lines, scan_xy);
-        
+
 //         cloud_xyz.points.resize(scan_xy.size());
 //         for(uint32_t i = 0; i < scan_xy.size(); ++i) {
 //           cloud_xyz.points[i].x = scan_xy[i].x;
@@ -282,12 +266,11 @@ int main(int argc, char ** argv) {
 
 //         }
 
-
 //         pcl::PCLPointCloud2 pcl_pc2;
 //         pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
 //         sensor_msgs::PointCloud2 point_cloud2;
-//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
-//         pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
+//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
+//         point_cloud2); pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
 //         out_bag.write("/scan2", time, point_cloud2);
 //       }
 
@@ -310,27 +293,26 @@ int main(int argc, char ** argv) {
 //         pcl::PCLPointCloud2 pcl_pc2;
 //         pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
 //         sensor_msgs::PointCloud2 point_cloud2;
-//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud, point_cloud2);
-//         pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
+//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
+//         point_cloud2); pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
 //         point_cloud2.header.frame_id="/map";
 //         out_bag.write("/map_cloud", time, point_cloud2);
-
 
 //       }
 
 //     }
 
-  
 //     cerr << "untwist: " << untwist_timer.get_elapsed_seconds() << endl;
 //     cerr << "move_scan: "  << move_scan_timer.get_elapsed_seconds() << endl;
-//     cerr << "scan_difference: " <<  scan_difference_timer.get_elapsed_seconds() << endl;
-//     cerr << "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl;
-//     cerr << "total difference count: " << g_scan_difference_count << endl;
-//     cerr << "total wrap count: " << g_wrap_count << endl;
+//     cerr << "scan_difference: " <<
+//     scan_difference_timer.get_elapsed_seconds() << endl; cerr <<
+//     "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl; cerr
+//     << "total difference count: " << g_scan_difference_count << endl; cerr <<
+//     "total wrap count: " << g_wrap_count << endl;
 
 //     cout << "closing bag" << endl;
 //     bag.close();
 
-    // find closures
-    //mapper.do_loop_closure();
+// find closures
+// mapper.do_loop_closure();
 // }
