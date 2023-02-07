@@ -222,7 +222,9 @@ public:
 
     last_index_checked = pose_graph.m_vertices.size()-1;
 
-    std::string g2o_path = "/g2o/bin";
+    // TODO: Move this, should use version from /usr/local/bin
+    // to make below work, you must copy g2o to my folder
+    std::string g2o_path = "/home/brian/g2o/bin";
     if(closure_count > 0) {
       this->write_g2o(g2o_path+"/path.g2o");
       std::string cmd = g2o_path+"/g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
