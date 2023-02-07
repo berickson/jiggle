@@ -385,7 +385,7 @@ vector<LineSegment<T>> get_world() {
     world.emplace_back(-10, 3, 10, 3);
     world.emplace_back(-10, -3, 10, -3);
     world.emplace_back(10, 2, 10, -3);
-    world.emplace_back(-10, 3, -10, -3);
+    // world.emplace_back(-10, 3, -10, -3);
     return world;
 }
 
@@ -416,7 +416,7 @@ MinimizeResult<T> minimize(vector<T> guess, std::function<T(const vector<T>&)> f
 
     // potential changes
     auto dp = std::vector<T>(guess.size(), 0.1);
-    const T growth_rate = 1.3;
+    const T growth_rate = 1.5;
     const auto p_size = p.size();
 
 

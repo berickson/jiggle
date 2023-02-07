@@ -54,7 +54,7 @@ TEST(dewarp, hand_picked_match_scans) {
   Pose<float> origin;
   Pose<float> p(-0.08, -0.143, degrees2radians(-3.3));
 
-  test_match_scan<float>(world, origin, p, true);
+  test_match_scan<float>(world, origin, p, false);
 }
 
 
