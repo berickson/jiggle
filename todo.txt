@@ -5,3 +5,6 @@ Merge live mapping and process bag, if live, input will come from subscribed top
 Process bag should simply call service to process scan.
 Expose performance statistics in to ros
 Remove deprecated pcl_conversionD::moveFromPCL
+
+
+Fix backward pose in process bag pose array - deferred, probably because lidar is turned 180 degrees on robot

@@ -192,6 +192,48 @@ int main(int argc, char** argv) {
       out_bag.write(tf_msg, "/tf", time);
     }
 
+    // publish path as markers
+    {
+      visualization_msgs::msg::Marker marker;
+      marker.header.frame_id = "map";
+      marker.header.stamp = scan_msg.header.stamp;
+      marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+
+      marker.ns = "robot_path";
+      marker.id = 0;
+      marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+      marker.action = visualization_msgs::msg::Marker::ADD;
+      marker.pose.position.x = 0.0;
+      marker.pose.position.y = 0.0;
+      marker.pose.position.z = 0.0;
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+      marker.scale.x = 0.025;
+      marker.color.r = 0.7;
+      marker.color.g = 0.0;
+      marker.color.b = 1.0;
+      marker.color.a = 1.0;
+      marker.frame_locked = true;
+
+      /// grab poses from pose graph vertices
+      auto & v = mapper.pose_graph.m_vertices;
+      marker.points.reserve(v.size());
+      for (int i = 0; i < v.size(); ++i) {
+        auto & pose = v[i].m_property.pose;
+        geometry_msgs::msg::Point p;
+        p.x = pose.get_x();
+        p.y = pose.get_y();
+        p.z = 0;
+        marker.points.push_back(p);
+      }
+      out_bag.write(marker, "/path_marker",  time);
+
+      //g_marker_pub.publish(marker);
+
+    }
+
 
 
   }
@@ -199,78 +241,7 @@ int main(int argc, char** argv) {
 }
 
 
-//       // publish tf (map to neato_laser)
-//       {
-//         Pose<float> & pose = mapper.pose;
-//         geometry_msgs::TransformStamped ts;
-//         ts.header.frame_id = "map";
-//         ts.header.stamp = scan->header.stamp;
-//         ts.header.seq = scan->header.seq;
-//         ts.child_frame_id = "laser";
-//         ts.transform.translation.x = pose.get_x();
-//         ts.transform.translation.y = pose.get_y();
-//         ts.transform.translation.z = 0;
-//         tf2::Quaternion q;
-//         q.setRPY(0,0,pose.get_theta());
-//         ts.transform.rotation.x = q.x();
-//         ts.transform.rotation.y = q.y();
-//         ts.transform.rotation.z = q.z();
-//         ts.transform.rotation.w = q.w();
 
-//         tf::tfMessage  tf_msg;
-
-//         //tf2_msgs::TFMessage tf_msg;
-
-//         //tf::tfMessage tf_msg;
-//         tf_msg.transforms.clear();
-//         tf_msg.transforms.push_back(ts);
-
-//         out_bag.write("/tf", time, tf_msg);
-
-//       }
-
-//       // publish path as markers
-//       {
-//         visualization_msgs::Marker marker;
-//         marker.header.frame_id = "map";
-//         marker.header.stamp = scan->header.stamp;
-//         marker.type = visualization_msgs::Marker::LINE_STRIP;
-
-//         marker.ns = "robot_path";
-//         marker.id = 0;
-//         marker.type = visualization_msgs::Marker::LINE_STRIP;
-//         marker.action = visualization_msgs::Marker::ADD;
-//         marker.pose.position.x = 0.0;
-//         marker.pose.position.y = 0.0;
-//         marker.pose.position.z = 0.0;
-//         marker.pose.orientation.x = 0.0;
-//         marker.pose.orientation.y = 0.0;
-//         marker.pose.orientation.z = 0.0;
-//         marker.pose.orientation.w = 1.0;
-//         marker.scale.x = 0.025;
-//         marker.color.r = 0.7;
-//         marker.color.g = 0.0;
-//         marker.color.b = 1.0;
-//         marker.color.a = 1.0;
-//         marker.frame_locked = true;
-
-//         /// grab poses from pose graph vertices
-//         auto & v = mapper.pose_graph.m_vertices;
-//         marker.points.reserve(v.size());
-//         for (int i = 0; i < v.size(); ++i) {
-//           auto & pose = v[i].m_property.pose;
-//           geometry_msgs::Point p;
-//           p.x = pose.get_x();
-//           p.y = pose.get_y();
-//           p.z = 0;
-//           marker.points.push_back(p);
-//           ros::Time time(scan->header.stamp);
-//           out_bag.write("/path_marker",  time, marker);
-//         }
-
-//         //g_marker_pub.publish(marker);
-
-//       }
 
 //       // publish untwisted as a point cloud
 //       {
