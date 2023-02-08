@@ -1,18 +1,16 @@
 #include <rosbag2_cpp/converter_interfaces/serialization_format_converter.hpp>
 #include <rosbag2_cpp/converter_interfaces/serialization_format_deserializer.hpp>
 #include <rosbag2_cpp/reader.hpp>
-#include <rosbag2_cpp/writer.hpp>
-#include <rosbag2_storage/storage_filter.hpp>
-
-#include <rosbag2_cpp/writers/sequential_writer.hpp>
 #include <rosbag2_cpp/typesupport_helpers.hpp>
-
+#include <rosbag2_cpp/writer.hpp>
+#include <rosbag2_cpp/writers/sequential_writer.hpp>
+#include <rosbag2_storage/storage_filter.hpp>
 
 #include "rosbag2_cpp/typesupport_helpers.hpp"
 
 // #include <rosbag/  view.h>
-#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -39,6 +37,7 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "lidar_mapper.h"
+#include "point_cloud_helper.h"
 
 using namespace std;
 
@@ -58,7 +57,7 @@ int main(int argc, char** argv) {
   rosbag2_cpp::Writer out_bag;
   out_bag.open(bag_path + ".out.bag");
 
-  uint32_t  n_scan = 0;
+  uint32_t n_scan = 0;
 
   rosbag2_storage::StorageFilter filter;
   filter.topics.push_back(std::string("/scan"));
@@ -77,7 +76,6 @@ int main(int argc, char** argv) {
 
   geometry_msgs::msg::PoseArray pose_array;
 
-
   // prepare ros2 bag reader / writer
   auto ros_message =
       std::make_shared<rosbag2_cpp::rosbag2_introspection_message_t>();
@@ -90,25 +88,26 @@ int main(int argc, char** argv) {
       rosbag2_cpp::converter_interfaces::SerializationFormatDeserializer>
       cdr_deserializer_;
 
-  auto library = rosbag2_cpp::get_typesupport_library("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
-  auto type_support = rosbag2_cpp::get_typesupport_handle("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
+  auto library = rosbag2_cpp::get_typesupport_library(
+      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
+  auto type_support = rosbag2_cpp::get_typesupport_handle(
+      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
   cdr_deserializer_ = factory.load_deserializer("cdr");
 
-  // const rosbag2_cpp::StorageOptions storage_options({path.string(), "sqlite3"});
-  // const rosbag2_cpp::ConverterOptions converter_options({rmw_get_serialization_format(), rmw_get_serialization_format()});
+  // const rosbag2_cpp::StorageOptions storage_options({path.string(),
+  // "sqlite3"}); const rosbag2_cpp::ConverterOptions
+  // converter_options({rmw_get_serialization_format(),
+  // rmw_get_serialization_format()});
   // std::unique_ptr<rosbag2_cpp::writers::SequentialWriter> writer_;
   // writer_ = std::make_unique<rosbag2_cpp::writers::SequentialWriter>();
   // writer_->open(storage_options, converter_options);
 
-  
-
   while (in_bag.has_next()) {
-
     // Read scan_msg from bag
     sensor_msgs::msg::LaserScan scan_msg;
     {
       // scan_msg = in_bag.read_next<sensor_msgs::msg::LaserScan>();
-      
+
       auto m = in_bag.read_next();
 
       rclcpp::SerializedMessage extracted_serialized_msg(*m->serialized_data);
@@ -124,12 +123,12 @@ int main(int argc, char** argv) {
       cdr_deserializer_->deserialize(m, type_support, ros_message);
 
       cout << topic << "frame_id: " << scan_msg.header.frame_id
-            << " sec: " << scan_msg.header.stamp.sec
-            << " nanosec: " << scan_msg.header.stamp.nanosec
-            << " scan_time: " << scan_msg.scan_time
-            << " reading count:" << scan_msg.ranges.size() << endl;
+           << " sec: " << scan_msg.header.stamp.sec
+           << " nanosec: " << scan_msg.header.stamp.nanosec
+           << " scan_time: " << scan_msg.scan_time
+           << " reading count:" << scan_msg.ranges.size() << endl;
 
-        ++n_scan;
+      ++n_scan;
     }
 
     // use the scan time for all messages
@@ -137,41 +136,42 @@ int main(int argc, char** argv) {
 
     // incorporate scan_msg into map
     {
-      if(n_scan > scan_count_limit) break;
+      if (n_scan > scan_count_limit) break;
       mapper.add_scan(scan_msg);
-      if(n_scan%2 == 0) {
+      if (n_scan % 2 == 0) {
         mapper.do_loop_closure();
       }
     }
 
-    // publish pose_array 
+    // publish pose_array
     {
       pose_array.header = scan_msg.header;
       pose_array.header.frame_id = "map";
 
       // populate the pose graph
-      auto & v = mapper.pose_graph.m_vertices;
-      auto & poses = pose_array.poses;
+      auto& v = mapper.pose_graph.m_vertices;
+      auto& poses = pose_array.poses;
       poses.resize(v.size());
       tf2::Quaternion quaternion;
-      for(size_t i = 0; i < v.size(); ++i) {
-        auto & pose = v[i].m_property.pose;
+      for (size_t i = 0; i < v.size(); ++i) {
+        auto& pose = v[i].m_property.pose;
         poses[i].position.x = pose.get_x();
         poses[i].position.y = pose.get_y();
         poses[i].position.z = 0;
-        quaternion.setRPY(0,0,pose.get_theta());
+        quaternion.setRPY(0, 0, pose.get_theta());
         poses[i].orientation.x = quaternion.x();
         poses[i].orientation.y = quaternion.y();
         poses[i].orientation.z = quaternion.z();
         poses[i].orientation.w = quaternion.w();
       }
 
-      out_bag.write<geometry_msgs::msg::PoseArray>(pose_array, "/calculated_path", time);
+      out_bag.write<geometry_msgs::msg::PoseArray>(pose_array,
+                                                   "/calculated_path", time);
     }
 
     // publish tf (map to neato_laser)
     {
-      Pose<float> & pose = mapper.pose;
+      Pose<float>& pose = mapper.pose;
       geometry_msgs::msg::TransformStamped ts;
       ts.header = scan_msg.header;
       ts.header.frame_id = "map";
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
       ts.transform.translation.y = pose.get_y();
       ts.transform.translation.z = 0;
       tf2::Quaternion q;
-      q.setRPY(0,0,pose.get_theta());
+      q.setRPY(0, 0, pose.get_theta());
       ts.transform.rotation.x = q.x();
       ts.transform.rotation.y = q.y();
       ts.transform.rotation.z = q.z();
@@ -218,107 +218,69 @@ int main(int argc, char** argv) {
       marker.frame_locked = true;
 
       /// grab poses from pose graph vertices
-      auto & v = mapper.pose_graph.m_vertices;
+      auto& v = mapper.pose_graph.m_vertices;
       marker.points.reserve(v.size());
       for (int i = 0; i < v.size(); ++i) {
-        auto & pose = v[i].m_property.pose;
+        auto& pose = v[i].m_property.pose;
         geometry_msgs::msg::Point p;
         p.x = pose.get_x();
         p.y = pose.get_y();
         p.z = 0;
         marker.points.push_back(p);
       }
-      out_bag.write(marker, "/path_marker",  time);
-
-      //g_marker_pub.publish(marker);
-
+      out_bag.write(marker, "/path_marker", time);
     }
 
+    // publish untwisted as a PointCloud2
+    {
+      sensor_msgs::msg::PointCloud2 point_cloud;
+      point_cloud.header = scan_msg.header;
+      auto& untwisted_scan =
+          mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size() - 1]
+              .m_property.untwisted_scan;
+      set_point_cloud_points(point_cloud, untwisted_scan);
 
+      out_bag.write(point_cloud, "/untwisted_scan", time);
+    }
 
+    // write original scan as PointCloud2 for tool support
+    {
+      vector<ScanLine<float>> lines;
+      ros_scan_to_scan_lines(scan_msg, lines);
+      vector<Point2d<float>> scan_xy;
+      get_scan_xy<float>(lines, scan_xy);
+
+      sensor_msgs::msg::PointCloud2 point_cloud;
+      point_cloud.header = scan_msg.header;
+      set_point_cloud_points(point_cloud, scan_xy);
+
+      out_bag.write(point_cloud, "/scan_cloud", time);
+    }
+
+    // write a map by projecting all scans to their poses
+    if (n_scan % 10 == 0) {
+      vector<Point2d<float>> points;
+
+      auto& v = mapper.pose_graph.m_vertices;
+      for (int i = 0; i < v.size(); ++i) {
+        auto& node = v[i].m_property;
+        auto& pose = node.pose;
+        auto& untwisted = node.untwisted_scan;
+        for (auto& point : untwisted) {
+          auto new_point = pose.Pose2World(point);
+          points.push_back(new_point);
+        }
+      }
+      sensor_msgs::msg::PointCloud2 point_cloud;
+      point_cloud.header = scan_msg.header;
+      point_cloud.header.frame_id = "map";
+      set_point_cloud_points(point_cloud, points);
+
+      out_bag.write(point_cloud, "/map_cloud", time);
+    }
   }
   mapper.write_path_csv(std::cout);
 }
-
-
-
-
-//       // publish untwisted as a point cloud
-//       {
-//         sensor_msgs::PointCloud point_cloud;
-//         ros::Time time(scan->header.stamp);
-//         point_cloud.channels.resize(0);
-//         point_cloud.header = scan->header;
-//         auto & untwisted_scan =
-//         mapper.pose_graph.m_vertices[mapper.pose_graph.m_vertices.size()-1].m_property.untwisted_scan;
-//         point_cloud.points.resize(untwisted_scan.size());
-//         for(uint32_t i = 0; i < untwisted_scan.size(); ++i) {
-//           point_cloud.points[i].x = untwisted_scan[i].x;
-//           point_cloud.points[i].y = untwisted_scan[i].y;
-//           point_cloud.points[i].z = 0;
-//         }
-//         out_bag.write("/untwisted_scan",  time, point_cloud);
-
-//         // write again as PointCloud2 as that is what many tools expect
-//         sensor_msgs::PointCloud2 point_cloud2;
-//         sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
-//         point_cloud2); out_bag.write("/untwisted_scan2", time, point_cloud2);
-//       }
-
-//       // also write original scan as PointCloud2 for tool support
-//       {
-//         ros::Time time(scan->header.stamp);
-//         // sensor_msgs::PointCloud point_cloud;
-//         pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
-
-//         pcl_conversions::toPCL(scan->header, cloud_xyz.header);
-
-//         vector<ScanLine<float>> lines;
-//         ros_scan_to_scan_lines(*scan, lines);
-//         vector<Point2d<float>> scan_xy;
-//         get_scan_xy<float>(lines, scan_xy);
-
-//         cloud_xyz.points.resize(scan_xy.size());
-//         for(uint32_t i = 0; i < scan_xy.size(); ++i) {
-//           cloud_xyz.points[i].x = scan_xy[i].x;
-//           cloud_xyz.points[i].y = scan_xy[i].y;
-//           cloud_xyz.points[i].z  = 0;
-
-//         }
-
-//         pcl::PCLPointCloud2 pcl_pc2;
-//         pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
-//         sensor_msgs::PointCloud2 point_cloud2;
-//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
-//         point_cloud2); pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
-//         out_bag.write("/scan2", time, point_cloud2);
-//       }
-
-//       // write a map by projecting all scans to their poses
-//       if(n_scan % 10 == 0)
-//       {
-//         pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
-//         auto & v = mapper.pose_graph.m_vertices;
-//         for (int i = 0; i < v.size(); ++i) {
-//           auto & node = v[i].m_property;
-//           auto & pose = node.pose;
-//           auto & untwisted = node.untwisted_scan;
-// //          auto transform = pose.Pose2WorldTransform();
-//           for(auto & point : untwisted) {
-//             auto new_point = pose.Pose2World(point);
-//             cloud_xyz.push_back(pcl::PointXYZ(new_point.x, new_point.y, 0));
-//             pcl_conversions::toPCL(scan->header, cloud_xyz.header);
-//           }
-//         }
-//         pcl::PCLPointCloud2 pcl_pc2;
-//         pcl::toPCLPointCloud2(cloud_xyz, pcl_pc2);
-//         sensor_msgs::PointCloud2 point_cloud2;
-//         //sensor_msgs::convertPointCloudToPointCloud2(point_cloud,
-//         point_cloud2); pcl_conversions::moveFromPCL(pcl_pc2, point_cloud2);
-//         point_cloud2.header.frame_id="/map";
-//         out_bag.write("/map_cloud", time, point_cloud2);
-
-//       }
 
 //     }
 
