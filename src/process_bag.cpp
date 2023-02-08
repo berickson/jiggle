@@ -4,17 +4,23 @@
 #include <rosbag2_cpp/writer.hpp>
 #include <rosbag2_storage/storage_filter.hpp>
 
+#include <rosbag2_cpp/writers/sequential_writer.hpp>
+#include <rosbag2_cpp/typesupport_helpers.hpp>
+
+
 #include "rosbag2_cpp/typesupport_helpers.hpp"
 
 // #include <rosbag/  view.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/point_cloud_conversion.hpp>
+// #include <sensor_msgs/point_cloud_conversion.hpp>
 #include <std_msgs/msg/int32.hpp>
 // #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <tf2_msgs/msg/tf_message.hpp>
 // #include <tf/tfMessage.h>
 #include <tf2/LinearMath/Transform.h>
 // #include <tf2/LinearMath/Quaternion.h>
@@ -38,7 +44,7 @@ using namespace std;
 
 int main(int argc, char** argv) {
   LidarMapper mapper;
-  rosbag2_cpp::Reader bag;
+  rosbag2_cpp::Reader in_bag;
   string bag_path =
       (argc >= 2)
           ? argv[1]
@@ -47,19 +53,19 @@ int main(int argc, char** argv) {
   uint32_t scan_count_limit = (argc >= 3) ? strtoul(argv[2], NULL, 10)
                                           : numeric_limits<uint32_t>::max();
 
-  bag.open(bag_path);  // BagMode is Read by default
+  in_bag.open(bag_path);  // BagMode is Read by default
 
-  // rosbag2_cpp::Writer out_bag;
-  // out_bag.open(bag_path + ".out.bag");
+  rosbag2_cpp::Writer out_bag;
+  out_bag.open(bag_path + ".out.bag");
 
-  uint32_t n_msg = 0, n_scan = 0;
+  uint32_t  n_scan = 0;
 
   rosbag2_storage::StorageFilter filter;
   filter.topics.push_back(std::string("/scan"));
   filter.topics.push_back(std::string("/poseupdate"));
   filter.topics.push_back(std::string("/tf"));
 
-  bag.set_filter(filter);
+  in_bag.set_filter(filter);
 
   Pose<float> pose;
   Pose<float> matched_pose(0, 0, 0);
@@ -71,6 +77,8 @@ int main(int argc, char** argv) {
 
   geometry_msgs::msg::PoseArray pose_array;
 
+
+  // prepare ros2 bag reader / writer
   auto ros_message =
       std::make_shared<rosbag2_cpp::rosbag2_introspection_message_t>();
   ros_message->time_stamp = 0;
@@ -82,73 +90,114 @@ int main(int argc, char** argv) {
       rosbag2_cpp::converter_interfaces::SerializationFormatDeserializer>
       cdr_deserializer_;
 
-  auto library = rosbag2_cpp::get_typesupport_library(
-      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
-  auto type_support = rosbag2_cpp::get_typesupport_handle(
-      "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
+  auto library = rosbag2_cpp::get_typesupport_library("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp");
+  auto type_support = rosbag2_cpp::get_typesupport_handle("sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
   cdr_deserializer_ = factory.load_deserializer("cdr");
 
-  while (bag.has_next()) {
-    auto m = bag.read_next();
+  // const rosbag2_cpp::StorageOptions storage_options({path.string(), "sqlite3"});
+  // const rosbag2_cpp::ConverterOptions converter_options({rmw_get_serialization_format(), rmw_get_serialization_format()});
+  // std::unique_ptr<rosbag2_cpp::writers::SequentialWriter> writer_;
+  // writer_ = std::make_unique<rosbag2_cpp::writers::SequentialWriter>();
+  // writer_->open(storage_options, converter_options);
 
-    ++n_msg;
+  
 
-    m.get();
+  while (in_bag.has_next()) {
 
-    rclcpp::SerializedMessage extracted_serialized_msg(*m->serialized_data);
-
-    auto topic = m->topic_name;
+    // Read scan_msg from bag
     sensor_msgs::msg::LaserScan scan_msg;
-    if (topic != "/scan") {
-      cout << "skipping message from " << topic << endl;
-      continue;
+    {
+      // scan_msg = in_bag.read_next<sensor_msgs::msg::LaserScan>();
+      
+      auto m = in_bag.read_next();
+
+      rclcpp::SerializedMessage extracted_serialized_msg(*m->serialized_data);
+
+      auto topic = m->topic_name;
+      if (topic != "/scan") {
+        cout << "skipping message from " << topic << endl;
+        continue;
+      }
+
+      ros_message->message = &scan_msg;
+
+      cdr_deserializer_->deserialize(m, type_support, ros_message);
+
+      cout << topic << "frame_id: " << scan_msg.header.frame_id
+            << " sec: " << scan_msg.header.stamp.sec
+            << " nanosec: " << scan_msg.header.stamp.nanosec
+            << " scan_time: " << scan_msg.scan_time
+            << " reading count:" << scan_msg.ranges.size() << endl;
+
+        ++n_scan;
     }
 
-    ros_message->message = &scan_msg;
+    // use the scan time for all messages
+    rclcpp::Time time(scan_msg.header.stamp);
 
-    cdr_deserializer_->deserialize(m, type_support, ros_message);
-
-    cout << topic << "frame_id: " << scan_msg.header.frame_id
-          << " sec: " << scan_msg.header.stamp.sec
-          << " nanosec: " << scan_msg.header.stamp.nanosec
-          << " scan_time: " << scan_msg.scan_time
-          << " reading count:" << scan_msg.ranges.size() << endl;
-
-      ++n_scan;
+    // incorporate scan_msg into map
+    {
       if(n_scan > scan_count_limit) break;
       mapper.add_scan(scan_msg);
       if(n_scan%2 == 0) {
         mapper.do_loop_closure();
       }
+    }
+
+    // publish pose_array 
+    {
+      pose_array.header = scan_msg.header;
+      pose_array.header.frame_id = "map";
+
+      // populate the pose graph
+      auto & v = mapper.pose_graph.m_vertices;
+      auto & poses = pose_array.poses;
+      poses.resize(v.size());
+      tf2::Quaternion quaternion;
+      for(size_t i = 0; i < v.size(); ++i) {
+        auto & pose = v[i].m_property.pose;
+        poses[i].position.x = pose.get_x();
+        poses[i].position.y = pose.get_y();
+        poses[i].position.z = 0;
+        quaternion.setRPY(0,0,pose.get_theta());
+        poses[i].orientation.x = quaternion.x();
+        poses[i].orientation.y = quaternion.y();
+        poses[i].orientation.z = quaternion.z();
+        poses[i].orientation.w = quaternion.w();
+      }
+
+      out_bag.write<geometry_msgs::msg::PoseArray>(pose_array, "/calculated_path", time);
+    }
+
+    // publish tf (map to neato_laser)
+    {
+      Pose<float> & pose = mapper.pose;
+      geometry_msgs::msg::TransformStamped ts;
+      ts.header = scan_msg.header;
+      ts.header.frame_id = "map";
+      ts.child_frame_id = "laser";
+      ts.transform.translation.x = pose.get_x();
+      ts.transform.translation.y = pose.get_y();
+      ts.transform.translation.z = 0;
+      tf2::Quaternion q;
+      q.setRPY(0,0,pose.get_theta());
+      ts.transform.rotation.x = q.x();
+      ts.transform.rotation.y = q.y();
+      ts.transform.rotation.z = q.z();
+      ts.transform.rotation.w = q.w();
+
+      tf2_msgs::msg::TFMessage tf_msg;
+      tf_msg.transforms.push_back(ts);
+
+      out_bag.write(tf_msg, "/tf", time);
+    }
+
+
+
   }
   mapper.write_path_csv(std::cout);
 }
 
-//      ros::Time time(scan->header.stamp);
-
-//       // publish pose_array
-//       {
-//         pose_array.header = scan->header;
-
-//         // populate the pose graph
-//         auto & v = mapper.pose_graph.m_vertices;
-//         auto & poses = pose_array.poses;
-//         poses.resize(v.size());
-//         tf2::Quaternion quaternion;
-//         for(size_t i = 0; i < v.size(); ++i) {
-//           auto & pose = v[i].m_property.pose;
-//           poses[i].position.x = pose.get_x();
-//           poses[i].position.y = pose.get_y();
-//           poses[i].position.z = 0;
-//           quaternion.setRPY(0,0,pose.get_theta());
-//           poses[i].orientation.x = quaternion.x();
-//           poses[i].orientation.y = quaternion.y();
-//           poses[i].orientation.z = quaternion.z();
-//           poses[i].orientation.w = quaternion.w();
-//         }
-
-//         out_bag.write("/calculated_path",  time, pose_array);
-//       }
 
 //       // publish tf (map to neato_laser)
 //       {

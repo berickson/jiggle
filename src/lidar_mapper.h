@@ -228,7 +228,7 @@ public:
     if(closure_count > 0) {
       this->write_g2o(g2o_path+"/path.g2o");
       std::string cmd = g2o_path+"/g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
-      system(cmd.c_str());
+      auto ignored = system(cmd.c_str());
       this->read_g2o(g2o_path+"/path_out.g2o");
       if(trace) cerr << "done closing" << endl;
     }

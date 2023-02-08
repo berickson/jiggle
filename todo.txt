@@ -1,0 +1,7 @@
+Re-add process_bag ROS outputs
+Scan untwisting should take into account whether any scans have been skipped.
+Scan untwisting should use odom as input_path.
+Merge live mapping and process bag, if live, input will come from subscribed topic, asynchronous will come from function calls
+Process bag should simply call service to process scan.
+Expose performance statistics in to ros
+Remove deprecated pcl_conversionD::moveFromPCL
