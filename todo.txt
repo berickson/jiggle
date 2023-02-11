@@ -1,10 +1,17 @@
-Re-add process_bag ROS outputs
+Speed up scan matching for large point count scans to run on Raspberry PI class computer
+process_bag Input and output files should be relative, not in "brian" folder
 Scan untwisting should take into account whether any scans have been skipped.
 Scan untwisting should use odom as input_path.
 Merge live mapping and process bag, if live, input will come from subscribed topic, asynchronous will come from function calls
 Process bag should simply call service to process scan.
-Expose performance statistics in to ros
+Expose performance statistics in to ros. CPU and call count of major functions.
+Track and cap memory usage
 Remove deprecated pcl_conversionD::moveFromPCL
 
 
+
+
+Done
+Re-add process_bag ROS outputs
 Fix backward pose in process bag pose array - deferred, probably because lidar is turned 180 degrees on robot
+G2O should be run from install location

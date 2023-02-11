@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "lidar_mapper.h"
-#include "point_cloud_helper.h""
+#include "point_cloud_helper.h"
 
 using namespace std;
 

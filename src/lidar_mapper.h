@@ -10,6 +10,7 @@
 
 #include <fstream>
 #include <string>
+#include <filesystem>
 
 inline float distance(float dx, float dy) {
   return sqrt(dx*dx+dy*dy);
@@ -222,12 +223,11 @@ public:
 
     last_index_checked = pose_graph.m_vertices.size()-1;
 
-    // TODO: Move this, should use version from /usr/local/bin
-    // to make below work, you must copy g2o to my folder
-    std::string g2o_path = "/home/brian/g2o/bin";
+    
+    std::string g2o_path = std::filesystem::temp_directory_path();
     if(closure_count > 0) {
       this->write_g2o(g2o_path+"/path.g2o");
-      std::string cmd = g2o_path+"/g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
+      std::string cmd = "g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
       auto ignored = system(cmd.c_str());
       this->read_g2o(g2o_path+"/path_out.g2o");
       if(trace) cerr << "done closing" << endl;
