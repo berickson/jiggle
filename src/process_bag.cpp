@@ -170,6 +170,59 @@ int main(int argc, char** argv) {
       out_bag.write(tf_msg, "/tf", time);
     }
 
+    // publish pose graph as makers
+    {
+      visualization_msgs::msg::Marker line_list;
+      line_list.header.frame_id = "map";
+      line_list.header.stamp = scan_msg.header.stamp;
+      line_list.type = visualization_msgs::msg::Marker::LINE_LIST;
+
+      line_list.ns = "pose_graph";
+      line_list.id = 0;
+      visualization_msgs::msg::MarkerArray markers;
+      line_list.action = visualization_msgs::msg::Marker::ADD;
+
+      line_list.pose.position.x = 0.0;
+      line_list.pose.position.y = 0.0;
+      line_list.pose.position.z = 0.0;
+      line_list.pose.orientation.x = 0.0;
+      line_list.pose.orientation.y = 0.0;
+      line_list.pose.orientation.z = 0.0;
+      line_list.pose.orientation.w = 1.0;
+      line_list.scale.x = 0.025;
+      line_list.color.r = 0.0;
+      line_list.color.g = 1.0;
+      line_list.color.b = 1.0;
+      line_list.color.a = 1.0;
+      line_list.frame_locked = true;
+
+      /// grab poses from pose graph vertices
+      auto& v = mapper.pose_graph.m_vertices;
+      auto& edges = mapper.pose_graph.m_edges;
+      line_list.points.reserve(edges.size());
+      for (auto& edge : edges) {
+        // The line list needs two points for each line
+        geometry_msgs::msg::Point p;
+
+        auto &pose1 = v[edge.m_source].m_property.pose;
+        geometry_msgs::msg::Point p1;
+        p1.x = pose1.get_x();
+        p1.y = pose1.get_y();
+        p1.z = 0;
+        line_list.points.push_back(p1);
+
+        auto &pose2 = v[edge.m_target].m_property.pose;
+        geometry_msgs::msg::Point p2;
+        p2.x = pose2.get_x();
+        p2.y = pose2.get_y();
+        p2.z = 0;
+        line_list.points.push_back(p2);
+
+
+      }
+      out_bag.write(line_list, "/pose_graph", time);
+    }
+
     // publish path as markers
     {
       visualization_msgs::msg::Marker marker;
