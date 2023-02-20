@@ -2,13 +2,22 @@ Expose performance statistics in to ros. CPU and call count of major functions.
 - call counts and times for untwist, match, loop Closure
 - memory and cpu externally?
 - send as diagnostics
+Publish pose graph. Show odometry links and closure links with different colors.
+Use fewer tries for loop closure. Currently 300
+- Quickly find nearby points. 
 Speed up scan matching for large point count scans to run on Raspberry PI class computer
+- Reduce point count
+- Rough vs. fine matching
+- Feature based estimate?
 Scan untwisting should take into account whether any scans have been skipped.
 Scan untwisting should use odom as input_path.
 Merge live mapping and process bag, if live, input will come from subscribed topic, asynchronous will come from function calls
 Process bag should simply call service to process scan.
 Track and cap memory usage
 Remove deprecated pcl_conversionD::moveFromPCL
+Make a map
+Can closures be validated using map entropy?
+    e.g. if you look a nearby scans, do they now align better or worse than before the closure?
 
 
 
