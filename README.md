@@ -21,6 +21,13 @@ pip install rosbag
 rosbag-convert <bag name>
 ```
 
+Useful commands
+```
+colcon build --packages-select jiggle --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+rm -rf ~/jiggle_ws/data/a3-lab-bar-kitchen-2020-07-14-21-38-09.out.bag && ros2 run jiggle process_bag
+```
+
 <h2>ROS2 Packages</h2>
 
 **lidar_odom**

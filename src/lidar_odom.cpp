@@ -69,6 +69,7 @@ public:
 
 
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan) {
+        lidar_odom_timer.start();
         vector<ScanLine<float>> lines;
         ros_scan_to_scan_lines(*scan, lines);
         scan_xy = get_scan_xy(lines);
@@ -201,6 +202,7 @@ public:
             }
         }
         last_scan_xy = untwisted;
+        lidar_odom_timer.stop();
     }
 
 };

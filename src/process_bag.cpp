@@ -280,6 +280,15 @@ int main(int argc, char** argv) {
     }
   }
   mapper.write_path_csv(std::cout);
+
+  cout << "time untwisting: " << untwist_timer.get_elapsed_seconds() << " count: " << untwist_timer.start_count << endl;
+  cout << "time moving: " << move_scan_timer.get_elapsed_seconds() << " count: " << move_scan_timer.start_count << endl;
+  cout << "time diffing: " << scan_difference_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
+  cout << "time closing loops: " << loop_closure_timer.get_elapsed_seconds() << " count: " << loop_closure_timer.start_count << endl;
+  cout << "time adding scans: " << add_scan_timer.get_elapsed_seconds() << " count: " << add_scan_timer.start_count << endl;
+  cout << "g2o time: " << g2o_timer.get_elapsed_seconds() << " count: " << g2o_timer.start_count << endl;
+  cout << "lidar_odom time: " << lidar_odom_timer.get_elapsed_seconds() << " count: " << lidar_odom_timer.start_count << endl;
+  cout << "total time matching: " << match_scans_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
 }
 
 //     }
@@ -290,7 +299,6 @@ int main(int argc, char** argv) {
 //     scan_difference_timer.get_elapsed_seconds() << endl; cerr <<
 //     "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl; cerr
 //     << "total difference count: " << g_scan_difference_count << endl; cerr <<
-//     "total wrap count: " << g_wrap_count << endl;
 
 //     cout << "closing bag" << endl;
 //     bag.close();

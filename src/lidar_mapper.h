@@ -12,6 +12,12 @@
 #include <string>
 #include <filesystem>
 
+Stopwatch loop_closure_timer;
+Stopwatch g2o_timer;
+Stopwatch lidar_odom_timer;
+Stopwatch add_scan_timer;
+
+
 inline float distance(float dx, float dy) {
   return sqrt(dx*dx+dy*dy);
 }
@@ -91,6 +97,7 @@ public:
 
 
   void add_scan(const sensor_msgs::msg::LaserScan& scan) {
+    add_scan_timer.start();
     uint32_t scans_per_match = 1;
 
 
@@ -138,6 +145,7 @@ public:
     }
 
     ++n_scan;
+    add_scan_timer.stop();
   }
 
   void write_g2o(std::string output_path) {
@@ -183,6 +191,7 @@ public:
   }
 
   void do_loop_closure() {
+    loop_closure_timer.start();
     bool trace = false;
     // don't re-check nodes
     static uint32_t last_index_checked = 0;
@@ -228,10 +237,13 @@ public:
     if(closure_count > 0) {
       this->write_g2o(g2o_path+"/path.g2o");
       std::string cmd = "g2o -o "+g2o_path+"/path_out.g2o "+g2o_path+"/path.g2o";
+      g2o_timer.start();
       auto ignored = system(cmd.c_str());
+      g2o_timer.stop();
       this->read_g2o(g2o_path+"/path_out.g2o");
       if(trace) cerr << "done closing" << endl;
     }
+    loop_closure_timer.stop();
   }
 
   void jiggle() {
