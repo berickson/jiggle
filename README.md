@@ -6,7 +6,7 @@ Jiggle Slam is a ROS2 package targeting services for mobile robots with 2D lidar
 
 Warning: Jiggle SLAM is in early development, is only partially implemented in and definitely isn't ready for your robot.
 
-<a href='https://www.youtube.com/watch?v=C_Unk488bV4'> <img src="https://i.ytimg.com/vi/C_Unk488bV4/maxresdefault.jpg" width="50%"/><br/>video demonstrates process_bag from Melodic branch</a>
+<a href='https://www.youtube.com/watch?v=_Qd8YkFvXkg'> <img src="https://i.ytimg.com/vi/_Qd8YkFvXkg/maxresdefault.jpg" width="50%"/><br/>video demonstrates process_bag from Humble branch</a>
 <br/>
 <br/>
 
