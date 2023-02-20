@@ -8,30 +8,16 @@
 
 #include "rosbag2_cpp/typesupport_helpers.hpp"
 
-// #include <rosbag/  view.h>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-// #include <sensor_msgs/point_cloud_conversion.hpp>
 #include <std_msgs/msg/int32.hpp>
-// #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
-// #include <tf/tfMessage.h>
 #include <tf2/LinearMath/Transform.h>
-// #include <tf2/LinearMath/Quaternion.h>
-// #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <geometry_msgs/msg/pose_array.hpp>
-
-// #include <tf2/tf2/convert.h>
-// #include <pcl_conversions/pcl_conversions.h>
-// #include <pcl/point_types.h>
-// #include <pcl/PCLPointCloud2.h>
-// #include <pcl/conversions.h>
-//  #include <pcl_ros/transforms.hpp>
-
 #include <iomanip>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -93,14 +79,6 @@ int main(int argc, char** argv) {
   auto type_support = rosbag2_cpp::get_typesupport_handle(
       "sensor_msgs/msg/LaserScan", "rosidl_typesupport_cpp", library);
   cdr_deserializer_ = factory.load_deserializer("cdr");
-
-  // const rosbag2_cpp::StorageOptions storage_options({path.string(),
-  // "sqlite3"}); const rosbag2_cpp::ConverterOptions
-  // converter_options({rmw_get_serialization_format(),
-  // rmw_get_serialization_format()});
-  // std::unique_ptr<rosbag2_cpp::writers::SequentialWriter> writer_;
-  // writer_ = std::make_unique<rosbag2_cpp::writers::SequentialWriter>();
-  // writer_->open(storage_options, converter_options);
 
   while (in_bag.has_next()) {
     // Read scan_msg from bag
@@ -290,19 +268,3 @@ int main(int argc, char** argv) {
   cout << "lidar_odom time: " << lidar_odom_timer.get_elapsed_seconds() << " count: " << lidar_odom_timer.start_count << endl;
   cout << "total time matching: " << match_scans_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
 }
-
-//     }
-
-//     cerr << "untwist: " << untwist_timer.get_elapsed_seconds() << endl;
-//     cerr << "move_scan: "  << move_scan_timer.get_elapsed_seconds() << endl;
-//     cerr << "scan_difference: " <<
-//     scan_difference_timer.get_elapsed_seconds() << endl; cerr <<
-//     "match_scans: " <<  match_scans_timer.get_elapsed_seconds() << endl; cerr
-//     << "total difference count: " << g_scan_difference_count << endl; cerr <<
-
-//     cout << "closing bag" << endl;
-//     bag.close();
-
-// find closures
-// mapper.do_loop_closure();
-// }

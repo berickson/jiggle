@@ -246,47 +246,4 @@ public:
     loop_closure_timer.stop();
   }
 
-  void jiggle() {
-    auto & g = pose_graph;
-    for(int pass = 0; pass< 100; ++pass) {
-        for(int i = 1; i < num_vertices(g); ++i) {
-            uint32_t n_estimates = 0;
-            double sum_x = 0;
-            double sum_y = 0;
-            double sum_theta = 0;
-            for(auto ep = in_edges(i, g);ep.first != ep.second; ++ep.first) {
-                // edge to our edge
-                
-                Pose<float> & delta = g[*ep.first].delta;
-                Polar<float> delta_polar = delta.get_polar();
-                Pose<float> & from_pose = g[ep.first->m_source].pose; 
-                if(from_pose.get_x() != NAN) {
-                    sum_x += from_pose.get_x() + cos(from_pose.get_theta() + delta_polar.theta) * delta_polar.r;
-                    sum_y += from_pose.get_y() + sin(from_pose.get_theta() + delta_polar.theta) * delta_polar.r;
-                    sum_theta += from_pose.get_theta() + delta.get_theta();
-                    ++n_estimates;
-                }
-            }
-            if(n_estimates > 0) {
-                // estimate = average calculated pose from connected poses
-                // pose is now estimated
-                g[i].pose = Pose<float>(sum_x / n_estimates, sum_y / n_estimates, sum_theta / n_estimates);
-            }
-        }
-
-
-        // cout << "pass: " << pass << endl;
-        // // print_poses(poses);
-        // cout << "     x,     y, theta" << endl;
-        // for(int i = 0; i < num_vertices(g); ++ i) {
-        //     Pose& pose = g[i];
-        //     cout << std::setw(6)  << std::setprecision(4) << pose.x << "," << std::setw(6) << std::setprecision(4) << pose.y << "," << std::setw(6) << pose.theta << endl;
-        // }
-
-        // cout << endl;
-
-    }
-
-  }
-
 };
