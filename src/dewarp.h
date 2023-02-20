@@ -763,26 +763,3 @@ void test_intersection() {
     cout << "signs ok";
     }
 }
-
-
-/*
-int main(int, char**)
-{
-
-    test_match_n_scans<float>(1000);
-
-
-    //test_prorate();
-    //test_minimize();
-    //test_scan_with_twist();
-    //test_intersection();
-    //test_fake_scan();
-
-    cout << "time untwisting: " << untwist_timer.get_elapsed_seconds() << endl;
-    cout << "time moving: " << move_scan_timer.get_elapsed_seconds() << endl;
-    cout << "time diffing: " << scan_difference_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
-    cout << "total time matching: " << match_scans_timer.get_elapsed_seconds() << endl;
-    return 0;
-
-}
-*/
