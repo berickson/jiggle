@@ -2,7 +2,6 @@ Expose performance statistics in to ros. CPU and call count of major functions.
 - call counts and times for untwist, match, loop Closure
 - memory and cpu externally?
 - send as diagnostics
-Publish pose graph. Show odometry links and closure links with different colors.
 Use fewer tries for loop closure. Currently 300
 - Quickly find nearby points. 
 Speed up scan matching for large point count scans to run on Raspberry PI class computer
@@ -28,3 +27,27 @@ process_bag Input and output files should be relative, not in "brian" folder
 Re-add process_bag ROS outputs
 Fix backward pose in process bag pose array - deferred, probably because lidar is turned 180 degrees on robot
 G2O should be run from install location
+Publish pose graph. Show odometry links and closure links with different colors.
+
+Timings
+-------
+2/20/2023, process_bag for a3-lab-bar-kitchen-2020-07-14-21-38-09.out.bag on desktop
+954 scans
+
+timings:
+    time untwisting: 0.0866838 count: 2859
+    time moving: 24.0287 count: 3416575
+    time diffing: 65.7843 count: 3416575
+    time closing loops: 76.9543 count: 477
+    time adding scans: 14.8727 count: 954
+    g2o time: 1.19372 count: 59
+    lidar_odom time: 0 count: 0
+    total time matching: 90.0735 count: 3416575
+
+observations: 
+    moving, diffing called 1195 times for every untwist (gradient descent)
+    odometry (adding scans) rate 64 scans per second
+    loop closure rate about 6 scans per second, mostly just returning without adding closures
+    g2o time about 20ms or 50 fps
+
+

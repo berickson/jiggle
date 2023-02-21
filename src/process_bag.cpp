@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
 
       auto topic = m->topic_name;
       if (topic != "/scan") {
-        cout << "skipping message from " << topic << endl;
+        // cout << "skipping message from " << topic << endl;
         continue;
       }
 
@@ -172,34 +172,85 @@ int main(int argc, char** argv) {
 
     // publish pose graph as makers
     {
-      visualization_msgs::msg::Marker line_list;
-      line_list.header.frame_id = "map";
-      line_list.header.stamp = scan_msg.header.stamp;
-      line_list.type = visualization_msgs::msg::Marker::LINE_LIST;
+      visualization_msgs::msg::Marker closure_lines;
+      closure_lines.header.frame_id = "map";
+      closure_lines.header.stamp = scan_msg.header.stamp;
+      closure_lines.type = visualization_msgs::msg::Marker::LINE_LIST;
 
-      line_list.ns = "pose_graph";
-      line_list.id = 0;
+      closure_lines.ns = "pose_graph";
+      closure_lines.id = 0;
       visualization_msgs::msg::MarkerArray markers;
-      line_list.action = visualization_msgs::msg::Marker::ADD;
+      closure_lines.action = visualization_msgs::msg::Marker::ADD;
 
-      line_list.pose.position.x = 0.0;
-      line_list.pose.position.y = 0.0;
-      line_list.pose.position.z = 0.0;
-      line_list.pose.orientation.x = 0.0;
-      line_list.pose.orientation.y = 0.0;
-      line_list.pose.orientation.z = 0.0;
-      line_list.pose.orientation.w = 1.0;
-      line_list.scale.x = 0.025;
-      line_list.color.r = 0.0;
-      line_list.color.g = 1.0;
-      line_list.color.b = 1.0;
-      line_list.color.a = 1.0;
-      line_list.frame_locked = true;
+      closure_lines.pose.position.x = 0.0;
+      closure_lines.pose.position.y = 0.0;
+      closure_lines.pose.position.z = 0.0;
+      closure_lines.pose.orientation.x = 0.0;
+      closure_lines.pose.orientation.y = 0.0;
+      closure_lines.pose.orientation.z = 0.0;
+      closure_lines.pose.orientation.w = 1.0;
+      closure_lines.scale.x = 0.01;
+      closure_lines.color.r = 0.0;
+      closure_lines.color.g = 1.0;
+      closure_lines.color.b = 1.0;
+      closure_lines.color.a = 1.0;
+      closure_lines.frame_locked = true;
+
+      visualization_msgs::msg::Marker path_lines;
+      path_lines.header.frame_id = "map";
+      path_lines.header.stamp = scan_msg.header.stamp;
+      path_lines.type = visualization_msgs::msg::Marker::LINE_LIST;
+
+      path_lines.ns = "pose_graph";
+      path_lines.id = 1;
+      path_lines.action = visualization_msgs::msg::Marker::ADD;
+
+      path_lines.pose.position.x = 0.0;
+      path_lines.pose.position.y = 0.0;
+      path_lines.pose.position.z = 0.0;
+      path_lines.pose.orientation.x = 0.0;
+      path_lines.pose.orientation.y = 0.0;
+      path_lines.pose.orientation.z = 0.0;
+      path_lines.pose.orientation.w = 1.0;
+      path_lines.scale.x = 0.01;
+      path_lines.color.r = 0.6;
+      path_lines.color.g = 0.3;
+      path_lines.color.b = 1.0;
+      path_lines.color.a = 1.0;
+      path_lines.frame_locked = true;
+
+
+      visualization_msgs::msg::Marker path_vertices;
+      path_vertices.header.frame_id = "map";
+      path_vertices.header.stamp = scan_msg.header.stamp;
+      path_vertices.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+
+      path_vertices.ns = "pose_graph";
+      path_vertices.id = 2;
+      path_vertices.action = visualization_msgs::msg::Marker::ADD;
+
+      path_vertices.pose.position.x = 0.0;
+      path_vertices.pose.position.y = 0.0;
+      path_vertices.pose.position.z = 0.0;
+      path_vertices.pose.orientation.x = 0.0;
+      path_vertices.pose.orientation.y = 0.0;
+      path_vertices.pose.orientation.z = 0.0;
+      path_vertices.pose.orientation.w = 1.0;
+      path_vertices.scale.x = 0.02;
+      path_vertices.scale.y = 0.02;
+      path_vertices.scale.z = 0.02;
+      path_vertices.color.r = 0.1;
+      path_vertices.color.g = 0.1;
+      path_vertices.color.b = 0.1;
+      path_vertices.color.a = 1.0;
+      path_vertices.frame_locked = true;
+
+
 
       /// grab poses from pose graph vertices
       auto& v = mapper.pose_graph.m_vertices;
       auto& edges = mapper.pose_graph.m_edges;
-      line_list.points.reserve(edges.size());
+      closure_lines.points.reserve(edges.size());
       for (auto& edge : edges) {
         // The line list needs two points for each line
         geometry_msgs::msg::Point p;
@@ -209,18 +260,34 @@ int main(int argc, char** argv) {
         p1.x = pose1.get_x();
         p1.y = pose1.get_y();
         p1.z = 0;
-        line_list.points.push_back(p1);
 
         auto &pose2 = v[edge.m_target].m_property.pose;
         geometry_msgs::msg::Point p2;
         p2.x = pose2.get_x();
         p2.y = pose2.get_y();
         p2.z = 0;
-        line_list.points.push_back(p2);
 
-
+        if(abs((int)edge.m_source-(int)edge.m_target)!=1) {
+          closure_lines.points.push_back(p1);
+          closure_lines.points.push_back(p2);
+        } else {
+          path_lines.points.push_back(p1);
+          path_lines.points.push_back(p2);
+        }
       }
-      out_bag.write(line_list, "/pose_graph", time);
+
+      for(auto & vertice : mapper.pose_graph.m_vertices) {
+        geometry_msgs::msg::Point p;
+        p.x = vertice.m_property.pose.get_x();
+        p.y = vertice.m_property.pose.get_y();
+        path_vertices.points.push_back(p);
+      }
+
+      out_bag.write(path_lines, "/pose_graph", time);
+      out_bag.write(closure_lines, "/pose_graph", time);
+      out_bag.write(path_vertices, "/pose_graph", time);
+
+
     }
 
     // publish path as markers
