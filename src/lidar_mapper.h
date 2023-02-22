@@ -96,12 +96,14 @@ public:
   }
 
 
-  void add_scan(const sensor_msgs::msg::LaserScan& scan) {
+  bool add_scan(const sensor_msgs::msg::LaserScan& scan) {
     add_scan_timer.start();
-    uint32_t scans_per_match = 1;
+    uint32_t scans_per_match = 5;
+    bool processed = false;
 
 
     if(n_scan % scans_per_match == 0) {
+      processed = true;
       ros_scan_to_scan_lines(scan, lines);
       scan_xy = get_scan_xy(lines);
 
@@ -131,9 +133,7 @@ public:
           scan_xy = untwisted; // save for next time
           pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
           auto e = boost::add_edge(v-1,v, m ,pose_graph);
-        
-          // nodes.emplace_back(node);
-          //pose_graph[pose_graph.m_vertices.size()] = node;
+
       }
       Node & node = pose_graph[v];
       node.header = scan.header;
@@ -146,6 +146,7 @@ public:
 
     ++n_scan;
     add_scan_timer.stop();
+    return processed;
   }
 
   void write_g2o(std::string output_path) {
@@ -214,16 +215,16 @@ public:
       auto node2 = pose_graph.m_vertices[index2].m_property;
       auto starting_diff = node1.pose.relative_pose_to(node2.pose);
       double d = starting_diff.get_polar().r;
-      if(d>2) continue;
+      if(d>6) continue;
       const Pose<float> null_pose;
-      auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, null_pose);
+      auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, starting_diff);
       //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
       double d_new = m.delta.get_polar().r;
-      // cerr << index1 << ", " << index2 << " score" << m.score << endl;
-      if(m.score < -850 && d_new > 0.05 && d_new < 3) {
+      cerr << index1 << ", " << index2 << " score" << m.score << endl;
+      if(m.score < -350 && d_new > 0.05 && d_new < 3) {
         trace = true;
-        if(trace) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
-        << " pose " << to_string(starting_diff) << " pose_new " << to_string(m.delta) << endl;
+        if(true) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
+        << " starting_diff " << to_string(starting_diff) << " diff_new " << to_string(m.delta) << endl;
         auto e = boost::add_edge(index1, index2, m, pose_graph);
         ++closure_count;
         break;

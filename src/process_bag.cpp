@@ -114,10 +114,13 @@ int main(int argc, char** argv) {
 
     // incorporate scan_msg into map
     {
+      static uint32_t last_closure_scan = 0;
       if (n_scan > scan_count_limit) break;
-      mapper.add_scan(scan_msg);
-      if (n_scan % 2 == 0) {
+      bool processed = mapper.add_scan(scan_msg);
+      if(!processed) continue;
+      if (n_scan > 2 && n_scan - last_closure_scan > 20) {
         mapper.do_loop_closure();
+        last_closure_scan = n_scan;
       }
     }
 
@@ -189,7 +192,7 @@ int main(int argc, char** argv) {
       closure_lines.pose.orientation.y = 0.0;
       closure_lines.pose.orientation.z = 0.0;
       closure_lines.pose.orientation.w = 1.0;
-      closure_lines.scale.x = 0.01;
+      closure_lines.scale.x = 0.02;
       closure_lines.color.r = 0.0;
       closure_lines.color.g = 1.0;
       closure_lines.color.b = 1.0;
@@ -212,7 +215,7 @@ int main(int argc, char** argv) {
       path_lines.pose.orientation.y = 0.0;
       path_lines.pose.orientation.z = 0.0;
       path_lines.pose.orientation.w = 1.0;
-      path_lines.scale.x = 0.01;
+      path_lines.scale.x = 0.02;
       path_lines.color.r = 0.6;
       path_lines.color.g = 0.3;
       path_lines.color.b = 1.0;
@@ -236,9 +239,9 @@ int main(int argc, char** argv) {
       path_vertices.pose.orientation.y = 0.0;
       path_vertices.pose.orientation.z = 0.0;
       path_vertices.pose.orientation.w = 1.0;
-      path_vertices.scale.x = 0.02;
-      path_vertices.scale.y = 0.02;
-      path_vertices.scale.z = 0.02;
+      path_vertices.scale.x = 0.04;
+      path_vertices.scale.y = 0.04;
+      path_vertices.scale.z = 0.04;
       path_vertices.color.r = 0.1;
       path_vertices.color.g = 0.1;
       path_vertices.color.b = 0.1;
@@ -283,9 +286,15 @@ int main(int argc, char** argv) {
         path_vertices.points.push_back(p);
       }
 
-      out_bag.write(path_lines, "/pose_graph", time);
-      out_bag.write(closure_lines, "/pose_graph", time);
-      out_bag.write(path_vertices, "/pose_graph", time);
+      if(path_lines.points.size() > 0) {
+        out_bag.write(path_lines, "/pose_graph_path", time);
+      }
+      if(closure_lines.points.size() > 0) {
+        out_bag.write(closure_lines, "/pose_graph_closures", time);
+      }
+      if(path_vertices.points.size() > 0) {
+        out_bag.write(path_vertices, "/pose_graph_vertices", time);
+      }
 
 
     }
@@ -355,27 +364,27 @@ int main(int argc, char** argv) {
       out_bag.write(point_cloud, "/scan_cloud", time);
     }
 
-    // write a map by projecting all scans to their poses
-    if (n_scan % 10 == 0) {
-      vector<Point2d<float>> points;
+    // // write a map by projecting all scans to their poses
+    // if (n_scan % 10 == 0) {
+    //   vector<Point2d<float>> points;
 
-      auto& v = mapper.pose_graph.m_vertices;
-      for (int i = 0; i < v.size(); ++i) {
-        auto& node = v[i].m_property;
-        auto& pose = node.pose;
-        auto& untwisted = node.untwisted_scan;
-        for (auto& point : untwisted) {
-          auto new_point = pose.Pose2World(point);
-          points.push_back(new_point);
-        }
-      }
-      sensor_msgs::msg::PointCloud2 point_cloud;
-      point_cloud.header = scan_msg.header;
-      point_cloud.header.frame_id = "map";
-      set_point_cloud_points(point_cloud, points);
+    //   auto& v = mapper.pose_graph.m_vertices;
+    //   for (int i = 0; i < v.size(); ++i) {
+    //     auto& node = v[i].m_property;
+    //     auto& pose = node.pose;
+    //     auto& untwisted = node.untwisted_scan;
+    //     for (auto& point : untwisted) {
+    //       auto new_point = pose.Pose2World(point);
+    //       points.push_back(new_point);
+    //     }
+    //   }
+    //   sensor_msgs::msg::PointCloud2 point_cloud;
+    //   point_cloud.header = scan_msg.header;
+    //   point_cloud.header.frame_id = "map";
+    //   set_point_cloud_points(point_cloud, points);
 
-      out_bag.write(point_cloud, "/map_cloud", time);
-    }
+    //   out_bag.write(point_cloud, "/map_cloud", time);
+    // }
   }
   mapper.write_path_csv(std::cout);
 

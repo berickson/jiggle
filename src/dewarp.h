@@ -347,7 +347,7 @@ vector<Point2d<T>> untwist_scan(
     Pose<T> pose = initial_pose;
     vector<Point2d<T>> untwisted;
 
-    bool ccw = false;
+    bool ccw = true;
 
     if(ccw) {
         // ccw
