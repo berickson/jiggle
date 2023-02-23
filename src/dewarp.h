@@ -627,7 +627,7 @@ T scan_difference(const vector<Point2d<T>> & scan1, const vector<Point2d<T>> & s
 
     }
     scan_difference_timer.stop();
-    return total_difference;
+    return total_difference / points_compared;
 }
 
 template <class T> void  get_scan_xy(const vector<ScanLine<T>> & scan, vector<Point2d<T>> & scan_xy) {

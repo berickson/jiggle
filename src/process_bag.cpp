@@ -118,7 +118,8 @@ int main(int argc, char** argv) {
       if (n_scan > scan_count_limit) break;
       bool processed = mapper.add_scan(scan_msg);
       if(!processed) continue;
-      if (n_scan > 2 && n_scan - last_closure_scan > 20) {
+      bool enable_closure = false;
+      if (enable_closure && n_scan > 2 && n_scan - last_closure_scan > 20) {
         mapper.do_loop_closure();
         last_closure_scan = n_scan;
       }

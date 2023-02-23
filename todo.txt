@@ -1,3 +1,4 @@
+Pass in tuning parameters
 Expose performance statistics in to ros. CPU and call count of major functions.
 - call counts and times for untwist, match, loop Closure
 - memory and cpu externally?

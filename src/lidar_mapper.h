@@ -221,7 +221,7 @@ public:
       //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
       double d_new = m.delta.get_polar().r;
       cerr << index1 << ", " << index2 << " score" << m.score << endl;
-      if(m.score < -350 && d_new > 0.05 && d_new < 3) {
+      if(m.score < -800 && d_new > 0.05 && d_new < 3) {
         trace = true;
         if(true) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
         << " starting_diff " << to_string(starting_diff) << " diff_new " << to_string(m.delta) << endl;
