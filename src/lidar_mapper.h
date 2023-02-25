@@ -96,9 +96,8 @@ public:
   }
 
 
-  bool add_scan(const sensor_msgs::msg::LaserScan& scan) {
+  bool add_scan(const sensor_msgs::msg::LaserScan& scan, uint32_t scans_per_match, bool dewarp, int dewarp_iterations) {
     add_scan_timer.start();
-    uint32_t scans_per_match = 5;
     bool processed = false;
 
 
@@ -109,7 +108,9 @@ public:
 
       auto v = boost::add_vertex(pose_graph);
 
+      ScanMatch<float> m;
       if(n_scan>0) {
+        if(dewarp) {
           //auto & twist = odom.twist.twist;
           auto untwisted = untwist_scan<float>(
               scan_xy, 
@@ -131,9 +132,13 @@ public:
           }
 
           scan_xy = untwisted; // save for next time
-          pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
-          auto e = boost::add_edge(v-1,v, m ,pose_graph);
-
+        }
+        else {
+          m = match_scans(last_scan_xy, scan_xy, diff);
+          diff = m.delta;
+        }
+        pose.move({diff.get_x(), diff.get_y()}, diff.get_theta());
+        auto e = boost::add_edge(v-1,v, m ,pose_graph);
       }
       Node & node = pose_graph[v];
       node.header = scan.header;

@@ -43,13 +43,41 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
           "./data/a3-lab-bar-kitchen-2020-07-14-21-38-09",
           d);
     }
+
+    {
+      rcl_interfaces::msg::ParameterDescriptor d;
+      d.description = "Maximum number of scans to process from bag";
+      d.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+      declare_parameter(
+          "max_scan_count", numeric_limits<int32_t>::max(), d);
+    }
+
+
     {
     rcl_interfaces::msg::ParameterDescriptor d;
-    d.description = "Maximum number of scans to process from bag";
-    d.type = rclcpp::ParameterType::PARAMETER_INTEGER;
-    declare_parameter(
-        "max_scan_count", numeric_limits<int32_t>::max(), d);
+      d.description = "True if the input scan will be warped due to movement and should be dewarped";
+      d.type = rclcpp::ParameterType::PARAMETER_BOOL;
+      declare_parameter(
+          "dewarp", true, d);
     }
+
+    {
+    rcl_interfaces::msg::ParameterDescriptor d;
+      d.description = "The number of times to dewarp and refine matching, only used if dewarp is True. Total number of scan matches per scan will be one higher than this value, n dewarp + 1 final.";
+      d.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+      declare_parameter(
+          "dewarp_iterations", 2, d);
+    }
+
+    {
+    rcl_interfaces::msg::ParameterDescriptor d;
+      d.description = "The interval, in scan count, between matching attempts. For example, 2 will only process every second scan.  10 will only process one out of 10 scans. The remainder will be skipped.";
+      d.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+      declare_parameter(
+          "scans_per_match", 1, d);
+    }
+
+
   }
 
   int process_bag(int argc, const char* argv[]) {
@@ -143,7 +171,13 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
       {
         static uint32_t last_closure_scan = 0;
         if (n_scan > scan_count_limit) break;
-        bool processed = mapper.add_scan(scan_msg);
+        bool dewarp;
+        int dewarp_iterations;
+        int scans_per_match;
+        get_parameter("dewarp", dewarp);
+        get_parameter("dewarp_iterations", dewarp_iterations);
+        get_parameter("scans_per_match", scans_per_match);
+        bool processed = mapper.add_scan(scan_msg, scans_per_match, dewarp, dewarp_iterations);
         if (!processed) continue;
         bool enable_closure = false;
         if (enable_closure && n_scan > 2 && n_scan - last_closure_scan > 20) {
@@ -411,12 +445,21 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
     }
     mapper.write_path_csv(std::cout);
 
-  cout << "time untwisting: " << untwist_timer.get_elapsed_seconds() << " count: " << untwist_timer.start_count << endl;
-  cout << "time moving: " << move_scan_timer.get_elapsed_seconds() << " count: " << move_scan_timer.start_count << endl;
-  cout << "time diffing: " << scan_difference_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
-  cout << "time closing loops: " << loop_closure_timer.get_elapsed_seconds() << " count: " << loop_closure_timer.start_count << endl;
-  cout << "time adding scans: " << add_scan_timer.get_elapsed_seconds() << " count: " << add_scan_timer.start_count << endl;
-  cout << "g2o time: " << g2o_timer.get_elapsed_seconds() << " count: " << g2o_timer.start_count << endl;
-  cout << "lidar_odom time: " << lidar_odom_timer.get_elapsed_seconds() << " count: " << lidar_odom_timer.start_count << endl;
-  cout << "total time matching: " << match_scans_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
+    cout << "time untwisting: " << untwist_timer.get_elapsed_seconds() << " count: " << untwist_timer.start_count << endl;
+    cout << "time moving: " << move_scan_timer.get_elapsed_seconds() << " count: " << move_scan_timer.start_count << endl;
+    cout << "time diffing: " << scan_difference_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
+    cout << "time closing loops: " << loop_closure_timer.get_elapsed_seconds() << " count: " << loop_closure_timer.start_count << endl;
+    cout << "time adding scans: " << add_scan_timer.get_elapsed_seconds() << " count: " << add_scan_timer.start_count << endl;
+    cout << "g2o time: " << g2o_timer.get_elapsed_seconds() << " count: " << g2o_timer.start_count << endl;
+    cout << "lidar_odom time: " << lidar_odom_timer.get_elapsed_seconds() << " count: " << lidar_odom_timer.start_count << endl;
+    cout << "total time matching: " << match_scans_timer.get_elapsed_seconds() << " count: " << scan_difference_timer.start_count<< endl;
+
+    return 0;
+  }
+};
+
+int main(int argc, char const* argv[]) {
+  rclcpp::init(argc, argv);
+  auto process_bag_node = std::make_shared<ProcessBagNode>("process_bag");
+  return process_bag_node->process_bag(argc, argv);
 }
