@@ -184,7 +184,7 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
         get_parameter("scans_per_match", scans_per_match);
         bool processed = mapper.add_scan(scan_msg, scans_per_match, dewarp, dewarp_iterations);
         if (!processed) continue;
-        bool enable_closure = false;
+        bool enable_closure = true;
         if (enable_closure && n_scan > 2 && n_scan - last_closure_scan > 20) {
           mapper.do_loop_closure();
           last_closure_scan = n_scan;

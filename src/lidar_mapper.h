@@ -208,25 +208,25 @@ public:
     vector<pair<size_t,size_t>> closures;
     
     uint32_t closure_count = 0;
-    for(int i = 0; i < 300; ++i) {
+    for(int i = 0; i < 1300; ++i) {
       size_t index1 = min_max_rand(last_index_checked+1,  pose_graph.m_vertices.size()-1);
       size_t index2 = min_max_rand(0, last_index_checked);
       if (trace) cerr << "indexes: " << index1 << ", " << index2 << endl;
 
-      if(labs(index1 - index2) < 30) continue;
+      if(labs(index1 - index2) < 2000) continue;
 
 
       auto node1 = pose_graph.m_vertices[index1].m_property;
       auto node2 = pose_graph.m_vertices[index2].m_property;
       auto starting_diff = node1.pose.relative_pose_to(node2.pose);
       double d = starting_diff.get_polar().r;
-      if(d>6) continue;
+      if(d>3) continue;
       const Pose<float> null_pose;
       auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan, starting_diff);
       //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
       double d_new = m.delta.get_polar().r;
       cerr << index1 << ", " << index2 << " score" << m.score << endl;
-      if(m.score < -800 && d_new > 0.05 && d_new < 3) {
+      if(m.score < -0.500 && d_new > 0.01 && d_new < 3) {
         trace = true;
         if(true) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
         << " starting_diff " << to_string(starting_diff) << " diff_new " << to_string(m.delta) << endl;

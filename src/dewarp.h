@@ -668,7 +668,7 @@ ScanMatch<T> match_scans(const vector<Point2d<T>> & scan1_xy, const vector<Point
         return d;
     };
 
-    MinimizeResult<T> r = minimize<T>({guess.get_x(),guess.get_y(),guess.get_theta()}, error_function, 0.0001, log_goal_steps);
+    MinimizeResult<T> r = minimize<T>({guess.get_x(),guess.get_y(),guess.get_theta()}, error_function, 0.001, log_goal_steps);
     Pose<T> match(r.p[0], r.p[1], r.p[2]);
     match_scans_timer.stop();
     return {match, r.error};
