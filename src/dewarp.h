@@ -341,13 +341,14 @@ vector<Point2d<T>> untwist_scan(
         T twist_x, 
         T twist_y, 
         T twist_theta, 
+        bool scan_rotation_reversed,
         Pose<T> initial_pose = Pose<T>()) {
     untwist_timer.start();
     int count = twisted_readings.size();
     Pose<T> pose = initial_pose;
     vector<Point2d<T>> untwisted;
 
-    bool ccw = true;
+    bool ccw = !scan_rotation_reversed;
 
     if(ccw) {
         // ccw
@@ -371,7 +372,6 @@ vector<Point2d<T>> untwist_scan(
         }
         std::reverse(untwisted.begin(), untwisted.end());
     }
-
 
     untwist_timer.stop();
 
@@ -742,7 +742,7 @@ void test_scan_with_twist() {
     Pose<double> pose1;
     auto twisted = scan_with_twist(world, reading_count, twist_x, twist_y, twist_theta, pose1);
     auto twisted_xy = get_scan_xy(twisted);
-    auto untwisted = untwist_scan(twisted_xy, twist_x, twist_y, twist_theta);
+    auto untwisted = untwist_scan(twisted_xy, twist_x, twist_y, twist_theta, false);
     cout << endl << endl << "twisted scan" << endl;
     print_scan(twisted);
     cout << endl << endl << "untwisted scan" << endl;

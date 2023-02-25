@@ -54,6 +54,14 @@ public:
             this->declare_parameter("dewarp_iterations", 2, param_desc);
         }
 
+        {
+            rcl_interfaces::msg::ParameterDescriptor d;
+            d.description = "Some scanners spin clockwise, but incorrectly report CCW angles, particularly the Slamtec scanners.  Setting this to True will cause the scans to be interpreted correctly.";
+            d.type = rclcpp::ParameterType::PARAMETER_BOOL;
+            declare_parameter(
+                "scan_rotation_reversed", false, d);
+        }        
+
         transform.setOrigin({0.0,0.0,0.0});
         tf2::Quaternion q;
         q.setRPY(0,0,0);
@@ -83,6 +91,8 @@ public:
                 int32_t dewarp_iterations = dewarp ? this->get_parameter("dewarp_iterations").get_parameter_value().get<int32_t>() : 1;
                 Pose<float> diff; // start with zero diff, todo: use velicity / odom to estimate
                 const int scans_per_match = 1;
+                bool scan_rotation_reversed;
+                get_parameter("scan_rotation_reversed", scan_rotation_reversed);
 
                 for(uint32_t i = 1; i <= dewarp_iterations; ++i) {
                     match = match_scans(last_scan_xy, untwisted, diff);
@@ -92,7 +102,8 @@ public:
                             scan_xy, 
                             diff.get_x()/scans_per_match, 
                             diff.get_y()/scans_per_match, 
-                            diff.get_theta()/scans_per_match);
+                            diff.get_theta()/scans_per_match,
+                            scan_rotation_reversed);
                     } else {
                         break;
                     }

@@ -52,7 +52,6 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
           "max_scan_count", numeric_limits<int32_t>::max(), d);
     }
 
-
     {
     rcl_interfaces::msg::ParameterDescriptor d;
       d.description = "True if the input scan will be warped due to movement and should be dewarped";
@@ -75,6 +74,14 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
       d.type = rclcpp::ParameterType::PARAMETER_INTEGER;
       declare_parameter(
           "scans_per_match", 1, d);
+    }
+
+    {
+    rcl_interfaces::msg::ParameterDescriptor d;
+      d.description = "Some scanners spin clockwise, but incorrectly report CCW angles, particularly the Slamtec scanners.  Setting this to True will cause the scans to be interpreted correctly.";
+      d.type = rclcpp::ParameterType::PARAMETER_BOOL;
+      declare_parameter(
+          "scan_rotation_reversed", false, d);
     }
 
 
@@ -179,10 +186,12 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
         bool dewarp;
         int dewarp_iterations;
         int scans_per_match;
+        bool scan_rotation_reversed;
         get_parameter("dewarp", dewarp);
         get_parameter("dewarp_iterations", dewarp_iterations);
         get_parameter("scans_per_match", scans_per_match);
-        bool processed = mapper.add_scan(scan_msg, scans_per_match, dewarp, dewarp_iterations);
+        get_parameter("scan_rotation_reversed", scan_rotation_reversed);
+        bool processed = mapper.add_scan(scan_msg, scans_per_match, dewarp, dewarp_iterations, scan_rotation_reversed);
         if (!processed) continue;
         bool enable_closure = true;
         if (enable_closure && n_scan > 2 && n_scan - last_closure_scan > 20) {
@@ -426,27 +435,27 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
         out_bag.write(point_cloud, "/scan_cloud", time);
       }
 
-      // // write a map by projecting all scans to their poses
-      // if (n_scan % 10 == 0) {
-      //   vector<Point2d<float>> points;
+      // write a map by projecting all scans to their poses
+      if (n_scan % 50 == 0) {
+        vector<Point2d<float>> points;
 
-      //   auto& v = mapper.pose_graph.m_vertices;
-      //   for (int i = 0; i < v.size(); ++i) {
-      //     auto& node = v[i].m_property;
-      //     auto& pose = node.pose;
-      //     auto& untwisted = node.untwisted_scan;
-      //     for (auto& point : untwisted) {
-      //       auto new_point = pose.Pose2World(point);
-      //       points.push_back(new_point);
-      //     }
-      //   }
-      //   sensor_msgs::msg::PointCloud2 point_cloud;
-      //   point_cloud.header = scan_msg.header;
-      //   point_cloud.header.frame_id = "map";
-      //   set_point_cloud_points(point_cloud, points);
+        auto& v = mapper.pose_graph.m_vertices;
+        for (int i = 0; i < v.size(); ++i) {
+          auto& node = v[i].m_property;
+          auto& pose = node.pose;
+          auto& untwisted = node.untwisted_scan;
+          for (auto& point : untwisted) {
+            auto new_point = pose.Pose2World(point);
+            points.push_back(new_point);
+          }
+        }
+        sensor_msgs::msg::PointCloud2 point_cloud;
+        point_cloud.header = scan_msg.header;
+        point_cloud.header.frame_id = "map";
+        set_point_cloud_points(point_cloud, points);
 
-      //   out_bag.write(point_cloud, "/map_cloud", time);
-      // }
+        out_bag.write(point_cloud, "/map_cloud", time);
+      }
     }
     mapper.write_path_csv(std::cout);
 

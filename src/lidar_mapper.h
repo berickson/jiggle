@@ -96,7 +96,7 @@ public:
   }
 
 
-  bool add_scan(const sensor_msgs::msg::LaserScan& scan, uint32_t scans_per_match, bool dewarp, int dewarp_iterations) {
+  bool add_scan(const sensor_msgs::msg::LaserScan& scan, uint32_t scans_per_match, bool dewarp, int dewarp_iterations, bool scan_rotation_reversed) {
     add_scan_timer.start();
     bool processed = false;
 
@@ -116,6 +116,7 @@ public:
               scan_xy, 
               diff.get_x()/scans_per_match, 
               diff.get_y()/scans_per_match, 
+              scan_rotation_reversed,
               diff.get_theta()/scans_per_match);
 
           m = match_scans(last_scan_xy, untwisted, diff);
@@ -125,6 +126,7 @@ public:
               scan_xy, 
               diff.get_x()/scans_per_match, 
               diff.get_y()/scans_per_match, 
+              scan_rotation_reversed,
               diff.get_theta()/scans_per_match);
 
             m = match_scans(last_scan_xy, untwisted, diff);
@@ -213,7 +215,7 @@ public:
       size_t index2 = min_max_rand(0, last_index_checked);
       if (trace) cerr << "indexes: " << index1 << ", " << index2 << endl;
 
-      if(labs(index1 - index2) < 2000) continue;
+      if(labs(index1 - index2) < 100) continue;
 
 
       auto node1 = pose_graph.m_vertices[index1].m_property;
@@ -226,7 +228,7 @@ public:
       //auto m = match_scans(node1.untwisted_scan, node2.untwisted_scan,node1.pose.relative_pose_to(node2.pose));
       double d_new = m.delta.get_polar().r;
       cerr << index1 << ", " << index2 << " score" << m.score << endl;
-      if(m.score < -0.500 && d_new > 0.01 && d_new < 3) {
+      if(m.score < -0.50 && d_new > 0.01 && d_new < 0.8) {
         trace = true;
         if(true) cerr << "adding edge from " << index1 << " to " << index2 << " with score " << m.score <<  " d_new " << d_new << " d " << d
         << " starting_diff " << to_string(starting_diff) << " diff_new " << to_string(m.delta) << endl;
