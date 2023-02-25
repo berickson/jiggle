@@ -93,7 +93,12 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
     in_bag.open(bag_path);  // BagMode is Read by default
 
     rosbag2_cpp::Writer out_bag;
-    out_bag.open(bag_path + ".out.bag");
+    std::string out_bag_path = bag_path + ".out.bag";
+    if(filesystem::exists(out_bag_path)) {
+      filesystem::remove_all(out_bag_path);
+    }
+
+    out_bag.open(out_bag_path);
 
     uint32_t n_scan = 0;
 

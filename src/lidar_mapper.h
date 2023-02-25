@@ -118,7 +118,7 @@ public:
               diff.get_y()/scans_per_match, 
               diff.get_theta()/scans_per_match);
 
-          auto m = match_scans(last_scan_xy, untwisted, diff);
+          m = match_scans(last_scan_xy, untwisted, diff);
           diff = m.delta;
           for(uint32_t i = 0; i < 2; ++i) {
             untwisted = untwist_scan<float>(
