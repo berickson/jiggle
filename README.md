@@ -75,8 +75,8 @@ ros2 run jiggle process_bag --ros-args -p input_bag_path:=./data/a3-lab-bar-kitc
 || Prune Scans for Performance, remove interior points on straight lines
 || Merge frames
 || Option to disable null map->lidar_odom transform
-| processs_bag ||Needs Humble port
-|| Loop Closure
+| processs_bag ||
+|| Loop Closure | X
 || Publish map->lidar_odom to TF
 
 
