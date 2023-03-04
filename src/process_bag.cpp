@@ -34,7 +34,7 @@ class ProcessBagNode : public rclcpp::Node {//, public std::enable_shared_from_t
   ProcessBagNode(const std::string& name) : Node(name) {
     {
       rcl_interfaces::msg::ParameterDescriptor d;
-      d.description = "path ros2 bag file to read scans from";
+      d.description = "path of ros2 bag file to read scans from";
       d.read_only = true;
       d.type = rclcpp::ParameterType::PARAMETER_STRING;
 
